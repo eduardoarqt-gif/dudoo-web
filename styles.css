@@ -1,0 +1,71 @@
+/* Dudoo Web — paleta do Dudoo (claro/escuro), mesma do app desktop e do mockup aprovado em 12/10/2026 */
+:root{
+  --fundo:#EFEEEA; --cartao:#F5F4F0; --branco:#FFFFFF; --borda:#D6D3CB;
+  --texto:#141412; --texto2:#6F6D68; --bronze:#9C8A6E; --bronze-esc:#7E6F57; --sobre-bronze:#FFFFFF;
+  --verde:#4A6E3F; --verde-bg:#DCE6D5; --verm:#B24F39; --verm-bg:#F0D9D2; --ambar:#A67C1E; --ambar-bg:#F1E6C8;
+  --aba-h:62px;
+}
+@media (prefers-color-scheme: dark){:root{
+  --fundo:#141412; --cartao:#201F1D; --branco:#2A2926; --borda:#3A3935;
+  --texto:#FAFAF8; --texto2:#A9A7A1; --bronze:#B7A589; --bronze-esc:#9C8A6E; --sobre-bronze:#141412;
+  --verde:#9DBB8F; --verde-bg:#2A3A25; --verm:#E0836D; --verm-bg:#3D2620; --ambar:#D9B65A; --ambar-bg:#3A2F14;
+  color-scheme:dark}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;background:var(--fundo);color:var(--texto);font-family:'Jost',-apple-system,system-ui,sans-serif;font-size:15px;
+  -webkit-text-size-adjust:100%;overscroll-behavior:none}
+#app{min-height:100%;padding:calc(env(safe-area-inset-top) + 12px) 16px calc(var(--aba-h) + env(safe-area-inset-bottom) + 24px);max-width:640px;margin:0 auto}
+h1{font-size:25px;font-weight:400;margin:6px 0 2px;line-height:1.15}
+h2.sec{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--bronze-esc);font-weight:500;margin:20px 0 8px}
+.mini{font-size:12.5px;color:var(--texto2)}
+.topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.atualizar{border:1px solid var(--borda);background:transparent;color:var(--texto2);border-radius:8px;padding:7px 10px;font:inherit;font-size:12px}
+.perg{display:flex;gap:8px;margin:12px 0 4px}
+.perg input{flex:1;min-width:0;background:var(--branco);border:1px solid var(--borda);border-radius:8px;padding:11px 12px;font:inherit;color:var(--texto)}
+.perg button{background:var(--bronze);color:var(--sobre-bronze);border:0;border-radius:8px;padding:0 16px;font:inherit;font-weight:500}
+.card{background:var(--cartao);border-radius:12px;padding:12px 13px;margin-bottom:8px}
+.card.toque{cursor:pointer}
+.card.toque:active{background:var(--borda)}
+.linha{display:flex;gap:10px;align-items:flex-start}
+.t{font-size:14.5px;line-height:1.3;min-width:0;flex:1}
+.p{font-size:12px;color:var(--texto2);margin-top:3px}
+.dir{margin-left:auto;flex:none;text-align:right}
+.pill{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.04em;padding:3px 8px;border-radius:99px;white-space:nowrap}
+.pill.v{background:var(--verde-bg);color:var(--verde)}.pill.r{background:var(--verm-bg);color:var(--verm)}
+.pill.a{background:var(--ambar-bg);color:var(--ambar)}.pill.c{background:var(--borda);color:var(--texto2)}
+.barra{height:6px;border-radius:4px;background:var(--borda);margin-top:9px;overflow:hidden}
+.barra i{display:block;height:100%;background:var(--bronze)}
+.seg{display:flex;background:var(--cartao);border-radius:10px;padding:3px;margin:12px 0}
+.seg button{flex:1;border:0;background:transparent;color:var(--texto2);font:inherit;font-size:13.5px;padding:8px 0;border-radius:8px}
+.seg button.on{background:var(--branco);color:var(--texto);font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.kpi{background:var(--cartao);border-radius:12px;padding:11px 12px}
+.kpi small{display:block;font-size:11.5px;color:var(--texto2)}
+.kpi strong{font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
+.val{font-variant-numeric:tabular-nums;font-weight:500;white-space:nowrap}
+.btn{display:block;width:100%;text-align:center;background:var(--bronze);color:var(--sobre-bronze);border:0;border-radius:9px;padding:12px;font:inherit;font-weight:500;margin-top:10px}
+.btn.o{background:transparent;color:var(--texto);border:1px solid var(--borda)}
+.btn.peq{display:inline-block;width:auto;padding:7px 12px;font-size:13px;margin:8px 8px 0 0}
+.acao{color:var(--verde);font-weight:600;font-size:13px;background:none;border:0;padding:6px 0 0;font:inherit;font-weight:600}
+.fab{position:fixed;right:16px;bottom:calc(var(--aba-h) + env(safe-area-inset-bottom) + 14px);background:var(--bronze);color:var(--sobre-bronze);border:0;
+  border-radius:99px;padding:13px 18px;font:inherit;font-weight:500;box-shadow:0 6px 16px rgba(0,0,0,.22)}
+.voltar{background:none;border:0;color:var(--bronze-esc);font:inherit;padding:4px 0}
+.check{flex:none;width:22px;height:22px;border-radius:50%;border:1.7px solid var(--texto2);background:transparent;margin-top:1px;padding:0}
+.check.ok{background:var(--verde);border-color:var(--verde)}
+.feita{text-decoration:line-through;color:var(--texto2)}
+#abas{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;background:var(--fundo);border-top:1px solid var(--borda);
+  padding:7px 4px calc(7px + env(safe-area-inset-bottom));z-index:10}
+#abas button{flex:1;background:none;border:0;color:var(--texto2);font:inherit;font-size:11px;padding:2px 0}
+#abas button i{display:block;width:24px;height:24px;margin:0 auto 3px;border-radius:8px;border:1.7px solid var(--texto2)}
+#abas button.on{color:var(--texto);font-weight:600}
+#abas button.on i{background:var(--bronze);border-color:var(--bronze)}
+#abas .n{position:absolute;margin:-2px 0 0 12px;background:var(--verm);color:#fff;border-radius:99px;font-size:9.5px;padding:1px 5px}
+#aviso{position:fixed;left:16px;right:16px;bottom:calc(var(--aba-h) + env(safe-area-inset-bottom) + 70px);background:var(--texto);color:var(--fundo);
+  padding:11px 14px;border-radius:10px;font-size:13.5px;z-index:20;text-align:center}
+.campo{width:100%;background:var(--branco);border:1px solid var(--borda);border-radius:8px;padding:11px 12px;font:inherit;color:var(--texto);margin-top:8px}
+textarea.campo{min-height:96px;resize:vertical}
+.bloqueio{text-align:center;padding:60px 10px}
+.bloqueio h1{margin-bottom:10px}
+.demo{display:inline-block;font-size:11px;color:var(--bronze-esc);border:1px solid var(--borda);border-radius:99px;padding:2px 9px;margin-top:6px}
+.vazio{color:var(--texto2);text-align:center;padding:26px 10px;font-size:14px}
+.pendente{border-left:3px solid var(--ambar)}

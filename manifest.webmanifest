@@ -1,0 +1,15 @@
+{
+  "name": "Dudoo Web",
+  "short_name": "Dudoo",
+  "description": "Hoje, projetos, portal do cliente e financeiro do escritório.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EFEEEA",
+  "theme_color": "#EFEEEA",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
