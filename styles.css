@@ -11,9 +11,10 @@
   --verde:#9DBB8F; --verde-bg:#2A3A25; --verm:#E0836D; --verm-bg:#3D2620; --ambar:#D9B65A; --ambar-bg:#3A2F14;
   color-scheme:dark}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%}
+html{overflow-x:hidden;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{width:100%;max-width:100%}
 body{margin:0;background:var(--fundo);color:var(--texto);font-family:'Jost',-apple-system,system-ui,sans-serif;font-size:15px;
-  -webkit-text-size-adjust:100%;overscroll-behavior:none}
+  -webkit-text-size-adjust:100%;touch-action:manipulation}
 #app{min-height:100%;padding:calc(env(safe-area-inset-top) + 12px) 16px calc(var(--aba-h) + env(safe-area-inset-bottom) + 24px);max-width:640px;margin:0 auto}
 h1{font-size:25px;font-weight:400;margin:6px 0 2px;line-height:1.15}
 h2.sec{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--bronze-esc);font-weight:500;margin:20px 0 8px}
@@ -75,3 +76,10 @@ textarea.campo{min-height:96px;resize:vertical}
 .mes button{width:42px;height:38px;border:1px solid var(--borda);background:var(--cartao);color:var(--texto);border-radius:10px;font:inherit;font-size:20px}
 .mes button:disabled{opacity:.35}
 .kpi small + strong + small{margin-top:2px}
+
+/* iPhone: nada pode passar da largura da tela (senão o Safari reduz a página inteira) e campos a 16px (evita zoom automático) */
+#app,#app *{max-width:100%}
+.t,.p,h1,.card{overflow-wrap:anywhere;word-break:break-word}
+.linha>*{min-width:0}
+input,textarea,select{font-size:16px}
+#abas{width:100%}
