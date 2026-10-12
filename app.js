@@ -366,6 +366,7 @@ function lerLinkDeConexao() {
 
 (async function iniciar() {
   lerLinkDeConexao();
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* sem suporte: segue */ }
   estado.dados = ler(CHAVE_DADOS, null);
   await carregar(false);
   desenhar();
