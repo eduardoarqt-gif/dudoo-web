@@ -13,31 +13,48 @@ const dataBr = (iso) => { const [a, m, d] = String(iso || "").split("-"); return
 
 const estado = {
   aba: "hoje", projeto: null, subProjeto: "resumo", subPortal: "atividade", fin: "escritorio", finSub: "receber",
-  dados: null, demo: true, fila: ler(CHAVE_FILA, []), liberado: false, liberadoEm: 0, ultimaAtualizacao: "",
+  dados: null, demo: true, fila: ler(CHAVE_FILA, []), liberado: false, liberadoEm: 0, ultimaAtualizacao: "", mes: "", erroConexao: "",
 };
 
 // ---------------------------------------------------------------- dados
 const cfg = () => ler(CHAVE_CFG, { base: "", token: "" });
 
+// Garante a estrutura nova do financeiro (por mês) mesmo com foto antiga/demonstração.
+function normalizarFinanceiro(d) {
+  const f = d.financeiro = d.financeiro || {};
+  const agora = new Date(), mesAtual = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
+  f.mes_atual = f.mes_atual || mesAtual;
+  f.meses = f.meses || [f.mes_atual];
+  for (const k of ["escritorio", "pessoal"]) {
+    const c = f[k] = f[k] || {};
+    if (!c.por_mes) c.por_mes = { [f.mes_atual]: { a_receber: c.a_receber || [], a_pagar: c.a_pagar || [] } };
+    c.projecao = c.projecao || [];
+  }
+  return d;
+}
+
 async function carregar(forcar) {
   const c = cfg();
+  estado.erroConexao = "";
   if (!c.base || !c.token) {
     estado.demo = true;
-    estado.dados = estado.dados || JSON.parse(JSON.stringify(window.DUDOO_DEMO));
+    estado.dados = normalizarFinanceiro(estado.dados || JSON.parse(JSON.stringify(window.DUDOO_DEMO)));
     return;
   }
   estado.demo = false;
   try {
     const r = await fetch(`${c.base.replace(/\/$/, "")}/dudoo_web_snapshot`, { headers: { "X-Dudoo-Token": c.token } });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    if (!r.ok) throw new Error(r.status === 403 ? "Chave de acesso não aceita pelo Wix." : `Erro ${r.status} do serviço.`);
     const j = await r.json();
-    if (j.vazio || !j.hoje) throw new Error("sem dados publicados ainda");
-    estado.dados = j;
+    if (j.vazio || !j.hoje) throw new Error("O Dudoo ainda não publicou os dados. Abra o Dudoo no computador.");
+    estado.dados = normalizarFinanceiro(j);
     gravar(CHAVE_DADOS, estado.dados);
     estado.ultimaAtualizacao = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   } catch (e) {
-    estado.dados = estado.dados || ler(CHAVE_DADOS, null) || JSON.parse(JSON.stringify(window.DUDOO_DEMO));
-    if (forcar) avisar("Sem conexão com o Dudoo. Mostrando os últimos dados.");
+    estado.erroConexao = String(e.message || e);
+    const cache = ler(CHAVE_DADOS, null);
+    estado.dados = cache ? normalizarFinanceiro(cache) : null;      // com conexão configurada, nunca cair em dados de exemplo
+    if (forcar) avisar(estado.erroConexao);
   }
 }
 
@@ -136,6 +153,8 @@ function telaHoje() {
   return `<div class="topo"><div><h1>${saud}, ${esc(d.usuario.nome)}!</h1><div class="mini">${esc(data)} · ${d.projetos.filter((p) => p.estado === "ativo").length} projetos ativos</div>${estado.demo ? '<span class="demo">dados de exemplo</span>' : ""}</div>
     <button class="atualizar" data-acao="atualizar">Atualizar</button></div>
     <form class="perg" data-form="pergunta"><input id="pergunta" placeholder="Pergunte ou peça algo ao Dudoo…" autocomplete="off"><button>Enviar</button></form>
+    ${estado.demo ? '<div class="card toque" data-aba-ir="mais"><div class="t"><b>Conectar ao Dudoo</b><div class="p">Você está vendo dados de exemplo. Toque para colar o link de conexão.</div></div></div>' : ""}
+    ${estado.erroConexao ? `<div class="card pendente"><div class="p" style="margin:0">${esc(estado.erroConexao)} Mostrando os últimos dados.</div></div>` : ""}
     <h2 class="sec">Precisa de você · ${d.hoje.precisa.length}</h2>
     ${d.hoje.precisa.map((i) => `<div class="card toque" data-precisa="${esc(i.id)}"><div class="linha"><div class="t">${esc(i.titulo)}<div class="p">${esc(i.detalhe)}</div></div><span class="pill ${i.cor || "c"} dir">${esc(i.badge)}</span></div></div>`).join("") || '<div class="vazio">Nada pendente agora.</div>'}
     <h2 class="sec">Agenda</h2>
@@ -182,43 +201,66 @@ function telaPortal() {
   return `<h1>Portal do cliente</h1><div class="seg">${abas.map(([k, n]) => `<button data-subportal="${k}" class="${estado.subPortal === k ? "on" : ""}">${n}</button>`).join("")}</div>${corpo}`;
 }
 
+const MESES_NOME = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const rotuloMes = (m) => { const [a, n] = String(m).split("-"); return `${MESES_NOME[Number(n) - 1] || m} ${a}`; };
+
 function telaFinanceiro() {
   if (!estado.liberado) {
     return `<div class="bloqueio"><h1>Financeiro</h1><div class="mini">Protegido por Face ID.</div><button class="btn" data-acao="liberar">Liberar com Face ID</button></div>`;
   }
-  const f = estado.dados.financeiro[estado.fin];
-  const soma = (l) => l.filter((x) => x.status !== "paga" && x.status !== "recebida").reduce((s, x) => s + x.valor, 0);
+  const F = estado.dados.financeiro, c = F[estado.fin];
+  const meses = F.meses, mes = meses.includes(estado.mes) ? estado.mes : (meses.includes(F.mes_atual) ? F.mes_atual : meses[0]);
+  estado.mes = mes;
+  const idx = meses.indexOf(mes), dadosMes = c.por_mes[mes] || { a_receber: [], a_pagar: [] };
+  const aberta = (x) => x.status !== "paga" && x.status !== "recebida";
+  const soma = (l, f) => l.filter(f).reduce((s, x) => s + x.valor, 0);
   const subs = [["receber", "A receber"], ["pagar", "A pagar"], ["projecao", "Projeção"]];
   let corpo = "";
   if (estado.finSub === "projecao") {
-    corpo = f.projecao.map((m) => `<div class="card"><div class="linha"><div class="t"><b>${esc(m.mes)}</b><div class="p">Entradas ${brl(m.entradas)} · Saídas ${brl(m.saidas)}</div></div><span class="val dir" style="color:${m.entradas >= m.saidas ? "var(--verde)" : "var(--verm)"}">${brl(m.entradas - m.saidas)}</span></div></div>`).join("");
+    corpo = (c.projecao.map((m) => `<div class="card"><div class="linha"><div class="t"><b>${esc(m.mes)}</b><div class="p">Entradas ${brl(m.entradas)} · Saídas ${brl(m.saidas)}</div></div><span class="val dir" style="color:${m.entradas >= m.saidas ? "var(--verde)" : "var(--verm)"}">${brl(m.entradas - m.saidas)}</span></div></div>`).join("")) || '<div class="vazio">Sem projeção para este escopo.</div>';
   } else {
-    const lista = estado.finSub === "receber" ? f.a_receber : f.a_pagar;
-    corpo = lista.map((c) => {
-      const fechada = c.status === "paga" || c.status === "recebida";
-      const pend = estado.fila.some((i) => i.status === "pendente" && i.payload.conta_id === c.id);
-      return `<div class="card ${pend ? "pendente" : ""}"><div class="linha"><div class="t"><b>${esc(c.descricao)}</b><div class="p"><span style="color:${c.status === "vencida" ? "var(--verm)" : "inherit"}">${c.status === "vencida" ? "Venceu" : "Vence"} ${dataBr(c.venc)}</span>${c.projeto ? " · " + esc(c.projeto) : ""}${pend ? " · aguardando o Dudoo" : ""}</div></div><span class="val dir">${brl(c.valor)}</span></div>
-        ${fechada ? '<div class="p">✓ Baixa registrada</div>' : `<button class="acao" data-baixa="${esc(c.id)}">✓ ${estado.finSub === "receber" ? (c.rt ? "Marcar recebida" : "Dar baixa") : "Marcar paga"}</button>`}</div>`;
-    }).join("") || '<div class="vazio">Nada por aqui.</div>';
+    const lista = estado.finSub === "receber" ? dadosMes.a_receber : dadosMes.a_pagar;
+    corpo = lista.map((x) => {
+      const fechada = !aberta(x);
+      const pend = x.id && estado.fila.some((i) => i.status === "pendente" && i.payload.conta_id === x.id);
+      const podeBaixar = x.id && !fechada && !(estado.fin === "pessoal" && estado.finSub === "pagar" && x.grupo !== "despesas");
+      const rotuloData = x.status === "vencida" ? "Venceu" : fechada ? (estado.finSub === "receber" ? "Recebida" : "Paga") : "Vence";
+      return `<div class="card ${pend ? "pendente" : ""}"><div class="linha"><div class="t"><b>${esc(x.descricao)}</b><div class="p"><span style="color:${x.status === "vencida" ? "var(--verm)" : "inherit"}">${rotuloData} ${dataBr(x.venc)}</span>${x.projeto ? " · " + esc(x.projeto) : ""}${pend ? " · aguardando o Dudoo" : ""}</div></div><span class="val dir" style="${fechada ? "color:var(--texto2)" : ""}">${brl(x.valor)}</span></div>
+        ${fechada ? '<div class="p">✓ Baixa registrada</div>' : podeBaixar ? `<button class="acao" data-baixa="${esc(x.id)}">✓ ${estado.finSub === "receber" ? (x.rt ? "Marcar recebida" : "Dar baixa") : "Marcar paga"}</button>` : '<div class="p">Baixa pelo Dudoo (cartão/financiamento).</div>'}</div>`;
+    }).join("") || `<div class="vazio">Nada em ${esc(rotuloMes(mes))}.</div>`;
   }
-  return `<h1>Financeiro</h1><div class="seg"><button data-fin="escritorio" class="${estado.fin === "escritorio" ? "on" : ""}">Escritório</button><button data-fin="pessoal" class="${estado.fin === "pessoal" ? "on" : ""}">Pessoal</button></div>
-    <div class="kpis"><div class="kpi"><small>A receber</small><strong>${brl(soma(f.a_receber))}</strong></div><div class="kpi"><small>A pagar</small><strong>${brl(soma(f.a_pagar))}</strong></div></div>
+  return `<h1>Financeiro</h1>
+    <div class="seg"><button data-fin="escritorio" class="${estado.fin === "escritorio" ? "on" : ""}">Escritório</button><button data-fin="pessoal" class="${estado.fin === "pessoal" ? "on" : ""}">Pessoal</button></div>
+    <div class="mes"><button data-mes="-1" ${idx <= 0 ? "disabled" : ""} aria-label="Mês anterior">‹</button><div><b>${esc(rotuloMes(mes))}</b>${mes === F.mes_atual ? '<span class="mini"> · mês atual</span>' : ""}</div><button data-mes="1" ${idx >= meses.length - 1 ? "disabled" : ""} aria-label="Próximo mês">›</button></div>
+    <div class="kpis"><div class="kpi"><small>A receber</small><strong>${brl(soma(dadosMes.a_receber, aberta))}</strong><small>Recebido ${brl(soma(dadosMes.a_receber, (x) => !aberta(x)))}</small></div>
+      <div class="kpi"><small>A pagar</small><strong>${brl(soma(dadosMes.a_pagar, aberta))}</strong><small>Pago ${brl(soma(dadosMes.a_pagar, (x) => !aberta(x)))}</small></div></div>
     <div class="seg">${subs.map(([k, n]) => `<button data-finsub="${k}" class="${estado.finSub === k ? "on" : ""}">${n}</button>`).join("")}</div>${corpo}
     ${estado.finSub === "receber" ? '<button class="fab" data-acao="nova-receber">+ Conta a receber</button>' : ""}`;
 }
 
+function blocoConexao() {
+  return `<div class="p" style="margin:0 0 6px">Cole o link de conexão que o Dudoo copiou (Configurações → Dudoo Web → Copiar link de conexão do iPhone).</div>
+    <textarea class="campo" id="cfg-link" placeholder="https://eduardoarqt-gif.github.io/dudoo-web/#c=..." style="min-height:70px;margin-top:0"></textarea>
+    <button class="btn" data-acao="colar-link">Conectar</button>`;
+}
+
 function telaMais() {
-  const c = cfg(), ponto = estado.dados.usuario.ponto === "dentro";
+  const ponto = estado.dados.usuario.ponto === "dentro";
   return `<h1>Mais</h1>
     <h2 class="sec">Ponto</h2><div class="card"><div class="linha"><div class="t">${ponto ? "Você está com o ponto aberto" : "Ainda não bateu o ponto"}</div></div><button class="btn" data-acao="ponto">${ponto ? "Registrar saída" : "Registrar entrada"}</button></div>
-    <h2 class="sec">Conexão com o Dudoo</h2><div class="card"><div class="p" style="margin:0 0 6px">${estado.demo ? "Modo demonstração (dados de exemplo)." : "Conectado" + (estado.ultimaAtualizacao ? " · atualizado às " + estado.ultimaAtualizacao : "")}${pendentes() ? ` · ${pendentes()} ação(ões) aguardando envio` : ""}</div>
-      <input class="campo" id="cfg-base" placeholder="Endereço do serviço" value="${esc(c.base)}" style="margin-top:0"><input class="campo" id="cfg-token" placeholder="Chave de acesso" type="password" value="${esc(c.token)}">
-      <button class="btn" data-acao="salvar-cfg">Salvar e conectar</button></div>
+    <h2 class="sec">Conexão com o Dudoo</h2><div class="card"><div class="p" style="margin:0 0 8px">${estado.demo ? "Modo demonstração (dados de exemplo)." : "Conectado" + (estado.ultimaAtualizacao ? " · atualizado às " + estado.ultimaAtualizacao : "")}${estado.erroConexao ? " · " + esc(estado.erroConexao) : ""}${pendentes() ? ` · ${pendentes()} ação(ões) aguardando envio` : ""}</div>
+      ${blocoConexao()}</div>
     <h2 class="sec">Sobre</h2><div class="card"><div class="p" style="margin:0">Dudoo Web 1.0 · Adicione à Tela de Início para abrir como app.</div></div>`;
 }
 
+function telaSemDados() {
+  return `<div class="bloqueio"><h1>Sem dados ainda</h1><div class="mini">${esc(estado.erroConexao || "Conecte o app ao Dudoo.")}</div>
+    <button class="btn" data-acao="atualizar">Tentar de novo</button>
+    <div class="card" style="margin-top:18px;text-align:left">${blocoConexao()}</div></div>`;
+}
+
 function desenhar() {
-  if (!estado.dados) return;
+  if (!estado.dados) { $("#app").innerHTML = telaSemDados(); desenharAbas(); return; }
   const telas = { hoje: telaHoje, projetos: telaProjetos, portal: telaPortal, financeiro: telaFinanceiro, mais: telaMais };
   const y = window.scrollY;
   $("#app").innerHTML = telas[estado.aba]();
@@ -237,6 +279,11 @@ document.addEventListener("click", async (e) => {
   if ((el = q("[data-subprojeto]"))) { estado.subProjeto = el.dataset.subprojeto; desenhar(); return; }
   if ((el = q("[data-subportal]"))) { estado.subPortal = el.dataset.subportal; desenhar(); return; }
   if ((el = q("[data-fin]"))) { estado.fin = el.dataset.fin; desenhar(); return; }
+  if ((el = q("[data-mes]"))) {
+    const m = estado.dados.financeiro.meses, i = m.indexOf(estado.mes) + Number(el.dataset.mes);
+    if (i >= 0 && i < m.length) { estado.mes = m[i]; desenhar(); }
+    return;
+  }
   if ((el = q("[data-finsub]"))) { estado.finSub = el.dataset.finsub; desenhar(); return; }
   if ((el = q("[data-tarefa]"))) {
     const p = d.projetos.find((x) => x.id === estado.projeto), t = p && p.tarefas.find((x) => x.id === el.dataset.tarefa);
@@ -244,7 +291,8 @@ document.addEventListener("click", async (e) => {
     return;
   }
   if ((el = q("[data-baixa]"))) {
-    const lista = estado.finSub === "receber" ? d.financeiro[estado.fin].a_receber : d.financeiro[estado.fin].a_pagar, c = lista.find((x) => x.id === el.dataset.baixa);
+    const pm = d.financeiro[estado.fin].por_mes[estado.mes] || { a_receber: [], a_pagar: [] };
+    const lista = estado.finSub === "receber" ? pm.a_receber : pm.a_pagar, c = lista.find((x) => x.id === el.dataset.baixa);
     if (!c) return;
     const tipo = estado.finSub === "receber" ? (c.rt ? "marcar_rt_recebida" : "marcar_conta_receber_recebida") : "marcar_conta_pagar_paga";
     comando(tipo, { conta_id: c.id, projeto: c.projeto || "", escopo: estado.fin, data: new Date().toISOString().slice(0, 10) }, () => { c.status = estado.finSub === "receber" ? "recebida" : "paga"; });
@@ -275,10 +323,15 @@ document.addEventListener("click", async (e) => {
       const valor = parseFloat((window.prompt("Valor (R$)") || "").replace(/\./g, "").replace(",", ".")); if (!(valor > 0)) { avisar("Valor inválido."); return; }
       const venc = window.prompt("Vencimento (AAAA-MM-DD)", new Date().toISOString().slice(0, 10)); if (!venc) return;
       const nova = { id: "novo-" + Date.now(), descricao, valor, venc, status: "aberta", projeto: estado.projeto || "" };
-      comando("criar_conta_receber", { descricao, valor, vencimento: venc, projeto: nova.projeto, escopo: estado.fin, local_id: nova.id }, () => { d.financeiro[estado.fin].a_receber.unshift(nova); });
-    } else if (a === "salvar-cfg") {
-      gravar(CHAVE_CFG, { base: $("#cfg-base").value.trim(), token: $("#cfg-token").value.trim() });
-      await carregar(true); desenhar(); avisar(estado.demo ? "Preencha endereço e chave." : "Conectado.");
+      comando("criar_conta_receber", { descricao, valor, vencimento: venc, projeto: nova.projeto, escopo: estado.fin, local_id: nova.id }, () => {
+        const pm = d.financeiro[estado.fin].por_mes[venc.slice(0, 7)];
+        if (pm) pm.a_receber.unshift(nova);
+      });
+    } else if (a === "colar-link") {
+      const texto = (($("#cfg-link") || {}).value || "").trim();
+      const ok = conectarPorLink(texto);
+      if (!ok) { avisar("Link inválido. Copie de novo no Dudoo."); return; }
+      await carregar(true); await enviarFila(); desenhar(); avisar(estado.erroConexao || "Conectado ao Dudoo.");
     } else if (a === "whatsapp-projeto") avisar("Abre o WhatsApp do cliente quando o Dudoo estiver conectado.");
   }
 });
@@ -291,18 +344,24 @@ document.addEventListener("submit", (e) => {
 });
 
 window.addEventListener("online", enviarFila);
-// Link de conexão (#c=<base64url {b: endereço, t: chave}>): salva a conexão e limpa o endereço da barra.
-function lerLinkDeConexao() {
+// Link de conexão (#c=<base64url {b: endereço, t: chave}>): salva a conexão. Aceita o link inteiro ou só o trecho "c=...".
+function conectarPorLink(texto) {
   try {
-    const m = /[#&]c=([A-Za-z0-9_-]+)/.exec(location.hash || "");
-    if (!m) return;
+    const m = /c=([A-Za-z0-9_-]+)/.exec(String(texto || ""));
+    if (!m) return false;
     let b = m[1].replace(/-/g, "+").replace(/_/g, "/");
     while (b.length % 4) b += "=";
-    const bruto = new TextDecoder().decode(Uint8Array.from(atob(b), (c) => c.charCodeAt(0)));
-    const c = JSON.parse(bruto);
-    if (c && c.b && c.t) gravar(CHAVE_CFG, { base: String(c.b), token: String(c.t) });
+    const c = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b), (ch) => ch.charCodeAt(0))));
+    if (!(c && c.b && c.t)) return false;
+    gravar(CHAVE_CFG, { base: String(c.b), token: String(c.t) });
+    return true;
+  } catch (e) { return false; }
+}
+function lerLinkDeConexao() {
+  if (/[#&]c=/.test(location.hash || "")) {
+    conectarPorLink(location.hash);
     history.replaceState(null, "", location.pathname + location.search);
-  } catch (e) { /* link inválido: segue sem conexão */ }
+  }
 }
 
 (async function iniciar() {

@@ -69,3 +69,9 @@ textarea.campo{min-height:96px;resize:vertical}
 .demo{display:inline-block;font-size:11px;color:var(--bronze-esc);border:1px solid var(--borda);border-radius:99px;padding:2px 9px;margin-top:6px}
 .vazio{color:var(--texto2);text-align:center;padding:26px 10px;font-size:14px}
 .pendente{border-left:3px solid var(--ambar)}
+
+.mes{display:flex;align-items:center;justify-content:space-between;margin:2px 0 10px}
+.mes b{font-size:17px;font-weight:500;text-transform:capitalize}
+.mes button{width:42px;height:38px;border:1px solid var(--borda);background:var(--cartao);color:var(--texto);border-radius:10px;font:inherit;font-size:20px}
+.mes button:disabled{opacity:.35}
+.kpi small + strong + small{margin-top:2px}
