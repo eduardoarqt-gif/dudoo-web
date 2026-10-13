@@ -17,6 +17,10 @@ window.DUDOO_DEMO = {
       { dia: "2026-10-17", hora: "10:00", titulo: "Outlet / calça" }
     ]
   },
+  notas: [
+    { id: "n1", titulo: "015-26 Deane E Vinicius", texto: "015-26 Deane E Vinicius" + String.fromCharCode(10) + "Cliente quer trocar o piso da varanda por porcelanato 120x120. Ver prazo com o fornecedor.", projeto: "015-26", atualizado: new Date().toISOString() },
+    { id: "n2", titulo: "Ideias para a vitrine da semana", texto: "Ideias para a vitrine da semana" + String.fromCharCode(10) + "Mostrar antes e depois da cozinha do Elliott.", projeto: "", atualizado: new Date(Date.now() - 86400000).toISOString() }
+  ],
   projetos: [
     { id: "015-26", codigo: "015-26", nome: "Deane e Vinicius", sub: "Casa Palmas · Projeto executivo", estado: "ativo", pct: 46, prazo: "Projetos de interiores — 22/08 (51 dias de atraso)", atrasado: true,
       frentes: [{ nome: "Arquitetônico", pct: 80 }, { nome: "Interiores", pct: 12 }],

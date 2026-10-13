@@ -21,6 +21,12 @@ h2.sec{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--b
 .mini{font-size:12.5px;color:var(--texto2)}
 .topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .atualizar{border:1px solid var(--borda);background:transparent;color:var(--texto2);border-radius:8px;padding:7px 10px;font:inherit;font-size:12px}
+.topo-botoes{display:flex;gap:6px;flex:none}
+.nbadge{display:inline-block;margin-left:6px;background:var(--verm);color:#fff;border-radius:99px;font-size:10px;padding:1px 6px;font-weight:600}
+details.nota summary{list-style:none;display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+details.nota summary::-webkit-details-marker{display:none}
+details.nota .p{display:block}
+.nota-texto{white-space:pre-wrap;font-size:14px;line-height:1.4;margin-top:10px;padding-top:10px;border-top:1px solid var(--borda);overflow-wrap:anywhere}
 .perg{display:flex;gap:8px;margin:12px 0 4px}
 .perg input{flex:1;min-width:0;background:var(--branco);border:1px solid var(--borda);border-radius:8px;padding:11px 12px;font:inherit;color:var(--texto)}
 .perg button{background:var(--bronze);color:var(--sobre-bronze);border:0;border-radius:8px;padding:0 16px;font:inherit;font-weight:500}

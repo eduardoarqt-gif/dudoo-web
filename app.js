@@ -3,7 +3,7 @@
    Sem conexão configurada o app abre em modo demonstração com dados de exemplo. */
 "use strict";
 
-const CHAVE_CFG = "dudoo_web_cfg", CHAVE_FILA = "dudoo_web_fila", CHAVE_DADOS = "dudoo_web_dados", CHAVE_CRED = "dudoo_web_cred", CHAVE_PIN = "dudoo_web_pin";
+const CHAVE_CFG = "dudoo_web_cfg", CHAVE_FILA = "dudoo_web_fila", CHAVE_DADOS = "dudoo_web_dados", CHAVE_CRED = "dudoo_web_cred", CHAVE_PIN = "dudoo_web_pin", CHAVE_NOTAS_VISTAS = "dudoo_web_notas_vistas";
 const $ = (s) => document.querySelector(s);
 const ler = (k, padrao) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch (e) { return padrao; } };
 const gravar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sem armazenamento: segue em memória */ } };
@@ -13,7 +13,7 @@ const dataBr = (iso) => { const [a, m, d] = String(iso || "").split("-"); return
 
 const estado = {
   aba: "hoje", projeto: null, subProjeto: "resumo", subPortal: "atividade", fin: "escritorio", finSub: "receber",
-  dados: null, demo: true, fila: ler(CHAVE_FILA, []), liberado: false, liberadoEm: 0, ultimaAtualizacao: "", mes: "", erroConexao: "",
+  filtroNotas: "__todas", dados: null, demo: true, fila: ler(CHAVE_FILA, []), liberado: false, liberadoEm: 0, ultimaAtualizacao: "", mes: "", erroConexao: "",
 };
 
 // ---------------------------------------------------------------- dados
@@ -21,6 +21,7 @@ const cfg = () => ler(CHAVE_CFG, { base: "", token: "" });
 
 // Garante a estrutura nova do financeiro (por mês) mesmo com foto antiga/demonstração.
 function normalizarFinanceiro(d) {
+  d.notas = Array.isArray(d.notas) ? d.notas : [];
   const f = d.financeiro = d.financeiro || {};
   const agora = new Date(), mesAtual = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
   f.mes_atual = f.mes_atual || mesAtual;
@@ -151,7 +152,8 @@ function telaHoje() {
   const data = hoje.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
   const hora = hoje.getHours(), saud = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
   return `<div class="topo"><div><h1>${saud}, ${esc(d.usuario.nome)}!</h1><div class="mini">${esc(data)} · ${d.projetos.filter((p) => p.estado === "ativo").length} projetos ativos</div>${estado.demo ? '<span class="demo">dados de exemplo</span>' : ""}</div>
-    <button class="atualizar" data-acao="atualizar">Atualizar</button></div>
+    <div class="topo-botoes"><button class="atualizar" data-aba-ir="notas" aria-label="Notas">Notas${novasNotas() ? `<span class="nbadge">${novasNotas()}</span>` : ""}</button>
+    <button class="atualizar" data-acao="atualizar">Atualizar</button></div></div>
     <form class="perg" data-form="pergunta"><input id="pergunta" placeholder="Pergunte ou peça algo ao Dudoo…" autocomplete="off"><button>Enviar</button></form>
     ${estado.demo ? '<div class="card toque" data-aba-ir="mais"><div class="t"><b>Conectar ao Dudoo</b><div class="p">Você está vendo dados de exemplo. Toque para colar o link de conexão.</div></div></div>' : ""}
     ${estado.erroConexao ? `<div class="card pendente"><div class="p" style="margin:0">${esc(estado.erroConexao)} Mostrando os últimos dados.</div></div>` : ""}
@@ -166,7 +168,7 @@ function telaProjetos() {
   if (estado.projeto) {
     const p = d.projetos.find((x) => x.id === estado.projeto);
     if (!p) { estado.projeto = null; return telaProjetos(); }
-    const abas = [["resumo", "Resumo"], ["tarefas", "Tarefas"], ["portal", "Portal"]];
+    const abas = [["resumo", "Resumo"], ["tarefas", "Tarefas"], ["notas", "Notas"], ["portal", "Portal"]];
     let corpo = "";
     if (estado.subProjeto === "resumo") {
       corpo = `<h2 class="sec">Andamento</h2><div class="card">${p.frentes.map((f) => `<div class="linha" style="margin-bottom:10px"><div class="t">${esc(f.nome)}<div class="barra"><i style="width:${f.pct}%"></i></div></div><span class="val dir">${f.pct}%</span></div>`).join("")}</div>
@@ -175,6 +177,8 @@ function telaProjetos() {
     } else if (estado.subProjeto === "tarefas") {
       corpo = `<h2 class="sec">Tarefas · ${p.tarefas.filter((t) => !t.feita).length} abertas</h2>` +
         (p.tarefas.map((t) => `<div class="card"><div class="linha"><button class="check ${t.feita ? "ok" : ""}" data-tarefa="${esc(t.id)}" aria-label="Concluir"></button><div class="t ${t.feita ? "feita" : ""}">${esc(t.titulo)}</div></div></div>`).join("") || '<div class="vazio">Sem tarefas.</div>');
+    } else if (estado.subProjeto === "notas") {
+      corpo = blocoNotas(p.codigo);
     } else {
       corpo = `<h2 class="sec">Avisar o cliente</h2><div class="card"><textarea class="campo" id="aviso-texto" placeholder="Escreva o aviso para o portal…"></textarea><button class="btn" data-acao="publicar-aviso" data-projeto="${esc(p.id)}">Publicar no portal</button></div>`;
     }
@@ -185,6 +189,41 @@ function telaProjetos() {
   const card = (p) => `<div class="card toque" data-projeto="${esc(p.id)}"><div class="linha"><div class="t"><b>${esc(p.codigo)} ${esc(p.nome)}</b><div class="p">${esc(p.sub)}</div></div><span class="pill ${p.estado === "ativo" ? "v" : "a"} dir">${p.estado === "ativo" ? "ATIVO" : "PAUSADO"}</span></div>
     <div class="barra"><i style="width:${p.pct}%"></i></div><div class="p">${p.pct}% · ${p.tarefas.filter((t) => !t.feita).length} tarefas abertas · <span style="color:${p.atrasado ? "var(--verm)" : "inherit"}">${esc(p.prazo)}</span></div></div>`;
   return `<h1>Projetos</h1><div class="mini">${ativos.length} ativos</div><h2 class="sec">Ativos</h2>${ativos.map(card).join("")}${outros.length ? `<h2 class="sec">Pausados</h2>${outros.map(card).join("")}` : ""}`;
+}
+
+// ---------------------------------------------------------------- notas (ligadas ao projeto pela etiqueta = número do projeto)
+const todasNotas = () => (estado.dados && estado.dados.notas) || [];
+const notasVistasEm = () => ler(CHAVE_NOTAS_VISTAS, "");
+function novasNotas() {
+  const visto = notasVistasEm();
+  if (!visto) return 0;
+  return todasNotas().filter((n) => !n.pendente && String(n.atualizado || "") > visto).length;
+}
+function marcarNotasVistas() {
+  const maior = todasNotas().reduce((m, n) => (String(n.atualizado || "") > m ? String(n.atualizado) : m), "");
+  gravar(CHAVE_NOTAS_VISTAS, maior || new Date().toISOString());
+}
+const quandoNota = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : `${dataBr(iso.slice(0, 10))} ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`; };
+function cartaoNota(n) {
+  const resto = String(n.texto || "").split("\n").slice(1).join("\n").trim();
+  const projeto = n.projeto ? `<span class="pill c">${esc(n.projeto)}</span>` : "";
+  return `<details class="card nota${n.pendente ? " pendente" : ""}"><summary><span class="t"><b>${esc(n.titulo)}</b><span class="p">${esc(quandoNota(n.atualizado))}${n.pendente ? " · aguardando o Dudoo" : ""}</span></span>${projeto}</summary>
+    <div class="nota-texto">${esc(resto || "(sem mais texto)")}</div></details>`;
+}
+function blocoNotas(codigo) {
+  const d = estado.dados, lista = todasNotas().filter((n) => (codigo === undefined ? true : codigo === "" ? !n.projeto : n.projeto === codigo));
+  const opcoes = `<option value="">Sem projeto</option>` + d.projetos.map((p) => `<option value="${esc(p.codigo)}" ${p.codigo === codigo ? "selected" : ""}>${esc(p.codigo)} ${esc(p.nome)}</option>`).join("");
+  return `<div class="card"><select class="campo" id="nota-projeto" style="margin-top:0">${opcoes}</select>
+      <textarea class="campo" id="nota-texto" placeholder="Escreva a nota…"></textarea><button class="btn" data-acao="salvar-nota">Salvar nota</button></div>
+    <h2 class="sec">${lista.length} nota(s)</h2>${lista.map(cartaoNota).join("") || '<div class="vazio">Nenhuma nota.</div>'}`;
+}
+function telaNotas() {
+  const filtro = estado.filtroNotas;
+  const d = estado.dados;
+  const opcoes = [`<option value="__todas" ${filtro === "__todas" ? "selected" : ""}>Todas as notas</option>`, `<option value="" ${filtro === "" ? "selected" : ""}>Sem projeto</option>`]
+    .concat(d.projetos.map((p) => `<option value="${esc(p.codigo)}" ${filtro === p.codigo ? "selected" : ""}>${esc(p.codigo)} ${esc(p.nome)}</option>`)).join("");
+  return `<button class="voltar" data-acao="voltar-hoje">‹ Hoje</button><h1>Notas</h1><div class="mini">Sincronizadas com o Simplenote · etiqueta = número do projeto</div>
+    <select class="campo" id="nota-filtro">${opcoes}</select>${blocoNotas(filtro === "__todas" ? undefined : filtro)}`;
 }
 
 function telaPortal() {
@@ -261,7 +300,8 @@ function telaSemDados() {
 
 function desenhar() {
   if (!estado.dados) { $("#app").innerHTML = telaSemDados(); desenharAbas(); return; }
-  const telas = { hoje: telaHoje, projetos: telaProjetos, portal: telaPortal, financeiro: telaFinanceiro, mais: telaMais };
+  if (!notasVistasEm()) marcarNotasVistas();             // 1ª vez: o que já existe não conta como "nova"
+  const telas = { hoje: telaHoje, projetos: telaProjetos, portal: telaPortal, financeiro: telaFinanceiro, mais: telaMais, notas: telaNotas };
   const y = window.scrollY;
   $("#app").innerHTML = telas[estado.aba]();
   desenharAbas();
@@ -274,7 +314,7 @@ document.addEventListener("click", async (e) => {
   const d = estado.dados;
   let el;
   if ((el = q("[data-aba]"))) { estado.aba = el.dataset.aba; estado.projeto = null; desenhar(); window.scrollTo(0, 0); if (estado.aba === "financeiro" && !estado.liberado) liberarFinanceiro(); return; }
-  if ((el = q("[data-aba-ir]"))) { estado.aba = el.dataset.abaIr; desenhar(); return; }
+  if ((el = q("[data-aba-ir]"))) { estado.aba = el.dataset.abaIr; if (estado.aba === "notas") marcarNotasVistas(); desenhar(); window.scrollTo(0, 0); return; }
   if ((el = q("[data-projeto]"))) { estado.projeto = el.dataset.projeto; estado.subProjeto = "resumo"; desenhar(); window.scrollTo(0, 0); return; }
   if ((el = q("[data-subprojeto]"))) { estado.subProjeto = el.dataset.subprojeto; desenhar(); return; }
   if ((el = q("[data-subportal]"))) { estado.subPortal = el.dataset.subportal; desenhar(); return; }
@@ -310,6 +350,16 @@ document.addEventListener("click", async (e) => {
     const a = el.dataset.acao;
     if (a === "atualizar") { await carregar(true); await enviarFila(); desenhar(); avisar(estado.demo ? "Modo demonstração." : "Atualizado."); }
     else if (a === "voltar") { estado.projeto = null; desenhar(); }
+    else if (a === "voltar-hoje") { estado.aba = "hoje"; desenhar(); }
+    else if (a === "salvar-nota") {
+      const texto = (($("#nota-texto") || {}).value || "").trim(), codigo = ($("#nota-projeto") || {}).value || "";
+      if (!texto) { avisar("Escreva a nota antes de salvar."); return; }
+      const proj = d.projetos.find((x) => x.codigo === codigo);
+      const completo = proj ? `${proj.codigo} ${proj.nome}\n${texto}` : texto;
+      const nova = { id: "novo-" + Date.now(), titulo: completo.split("\n")[0].slice(0, 80), texto: completo, projeto: codigo, atualizado: new Date().toISOString(), pendente: true };
+      comando("criar_nota", { texto, projeto: codigo, local_id: nova.id }, () => { d.notas.unshift(nova); });
+      avisar("Nota guardada. Vai pro Simplenote quando o Dudoo estiver aberto.");
+    }
     else if (a === "liberar") liberarFinanceiro();
     else if (a === "ponto") { const dentro = d.usuario.ponto === "dentro"; comando("ponto", { tipo: dentro ? "saida" : "entrada" }, () => { d.usuario.ponto = dentro ? "fora" : "dentro"; }); avisar(dentro ? "Saída registrada." : "Entrada registrada."); }
     else if (a === "publicar-aviso") {
@@ -334,6 +384,9 @@ document.addEventListener("click", async (e) => {
       await carregar(true); await enviarFila(); desenhar(); avisar(estado.erroConexao || "Conectado ao Dudoo.");
     } else if (a === "whatsapp-projeto") avisar("Abre o WhatsApp do cliente quando o Dudoo estiver conectado.");
   }
+});
+document.addEventListener("change", (e) => {
+  if (e.target && e.target.id === "nota-filtro") { estado.filtroNotas = e.target.value; desenhar(); }
 });
 document.addEventListener("submit", (e) => {
   const f = e.target.closest("[data-form='pergunta']"); if (!f) return;
