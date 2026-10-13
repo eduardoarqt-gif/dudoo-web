@@ -21,6 +21,21 @@ window.DUDOO_DEMO = {
     { id: "n1", titulo: "015-26 Deane E Vinicius", texto: "015-26 Deane E Vinicius" + String.fromCharCode(10) + "Cliente quer trocar o piso da varanda por porcelanato 120x120. Ver prazo com o fornecedor.", projeto: "015-26", atualizado: new Date().toISOString() },
     { id: "n2", titulo: "Ideias para a vitrine da semana", texto: "Ideias para a vitrine da semana" + String.fromCharCode(10) + "Mostrar antes e depois da cozinha do Elliott.", projeto: "", atualizado: new Date(Date.now() - 86400000).toISOString() }
   ],
+  conteudo: {
+    concluidos: 0, total: 3, contadores: { ideias: 4, planejados: 2, em_producao: 1, publicados: 0 },
+    series: ["Fato ou Mito", "Antes e depois", "Dicas"],
+    semana: [
+      { id: "c1", titulo: "Luz branca ilumina mais que luz amarela?", serie: "Fato ou Mito", prioridade: "alta", situacao: "solta", formatos: ["reels", "stories"], pecas: [] },
+      { id: "c2", titulo: "Antes e depois: Casa Bosque das Mansões", serie: "Antes e depois", prioridade: "normal", situacao: "aceita", formatos: ["feed", "reels"], pecas: [] },
+      { id: "c3", titulo: "3 erros comuns na escolha do piso", serie: "Dicas", prioridade: "normal", situacao: "solta", formatos: ["carrossel"], pecas: [] }
+    ],
+    ideias: [
+      { id: "c1", titulo: "Luz branca ilumina mais que luz amarela?", serie: "Fato ou Mito", situacao: "solta", formatos: ["reels", "stories"] },
+      { id: "c2", titulo: "Antes e depois: Casa Bosque das Mansões", serie: "Antes e depois", situacao: "aceita", formatos: ["feed", "reels"] },
+      { id: "c3", titulo: "3 erros comuns na escolha do piso", serie: "Dicas", situacao: "solta", formatos: ["carrossel"] },
+      { id: "c4", titulo: "Casa térrea é mais barata?", serie: "Fato ou Mito", situacao: "solta", formatos: [] }
+    ]
+  },
   projetos: [
     { id: "015-26", codigo: "015-26", nome: "Deane e Vinicius", sub: "Casa Palmas · Projeto executivo", estado: "ativo", pct: 46, prazo: "Projetos de interiores — 22/08 (51 dias de atraso)", atrasado: true,
       frentes: [{ nome: "Arquitetônico", pct: 80 }, { nome: "Interiores", pct: 12 }],

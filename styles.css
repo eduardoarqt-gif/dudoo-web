@@ -89,3 +89,21 @@ textarea.campo{min-height:96px;resize:vertical}
 .linha>*{min-width:0}
 input,textarea,select{font-size:16px}
 #abas{width:100%}
+
+/* Ideias: leque "de cinema" (scroll com snap + 3D por carta, calculado em ligarLeque) */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--borda);background:transparent;color:var(--texto2);border-radius:99px;padding:6px 11px;font:inherit;font-size:12.5px}
+.chip.on{background:var(--bronze);border-color:var(--bronze);color:var(--sobre-bronze);font-weight:500}
+.leque{margin:4px -16px 0;perspective:1000px}
+.trilho{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:18px calc(50% - 125px) 22px;scrollbar-width:none}
+.trilho::-webkit-scrollbar{display:none}
+.carta{flex:none;width:250px;min-height:300px;margin:0 -22px;scroll-snap-align:center;background:var(--cartao);border:1px solid var(--borda);border-radius:20px;
+  padding:16px;box-shadow:0 14px 30px rgba(0,0,0,.14);display:flex;flex-direction:column;gap:10px;will-change:transform}
+.carta h3{font-size:20px;font-weight:500;line-height:1.2;margin:4px 0 2px;overflow-wrap:anywhere}
+.carta .chips{margin-top:auto}
+.carta-acoes{display:flex;flex-wrap:wrap}
+.carta-acoes .btn.peq{margin:6px 6px 0 0}
+.carta.feita-c{opacity:.7}
+.pontos{display:flex;justify-content:center;gap:6px;margin-bottom:6px}
+.pontos i{width:6px;height:6px;border-radius:50%;background:var(--borda)}
+.pontos i.on{background:var(--bronze);width:16px;border-radius:4px}

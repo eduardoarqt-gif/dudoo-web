@@ -22,6 +22,7 @@ const cfg = () => ler(CHAVE_CFG, { base: "", token: "" });
 // Garante a estrutura nova do financeiro (por mês) mesmo com foto antiga/demonstração.
 function normalizarFinanceiro(d) {
   d.notas = Array.isArray(d.notas) ? d.notas : [];
+  d.conteudo = Object.assign({ semana: [], ideias: [], concluidos: 0, total: 0, contadores: {}, series: [], formatos: [] }, d.conteudo || {});
   const f = d.financeiro = d.financeiro || {};
   const agora = new Date(), mesAtual = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
   f.mes_atual = f.mes_atual || mesAtual;
@@ -136,7 +137,7 @@ async function liberarFinanceiro() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) estado.liberado = false; });
 
 // ---------------------------------------------------------------- telas
-const ABAS = [["hoje", "Hoje"], ["projetos", "Projetos"], ["portal", "Portal"], ["financeiro", "Financeiro"], ["mais", "Mais"]];
+const ABAS = [["hoje", "Hoje"], ["projetos", "Projetos"], ["ideias", "Ideias"], ["portal", "Portal"], ["financeiro", "Financeiro"], ["mais", "Mais"]];
 
 function desenharAbas() {
   const n = estado.dados ? estado.dados.hoje.precisa.length : 0;
@@ -301,11 +302,91 @@ function telaSemDados() {
 function desenhar() {
   if (!estado.dados) { $("#app").innerHTML = telaSemDados(); desenharAbas(); return; }
   if (!notasVistasEm()) marcarNotasVistas();             // 1ª vez: o que já existe não conta como "nova"
-  const telas = { hoje: telaHoje, projetos: telaProjetos, portal: telaPortal, financeiro: telaFinanceiro, mais: telaMais, notas: telaNotas };
+  const telas = { hoje: telaHoje, projetos: telaProjetos, ideias: telaIdeias, portal: telaPortal, financeiro: telaFinanceiro, mais: telaMais, notas: telaNotas };
   const y = window.scrollY;
   $("#app").innerHTML = telas[estado.aba]();
   desenharAbas();
   window.scrollTo(0, y);
+  if (estado.aba === "ideias") ligarLeque();
+}
+
+// ---------------------------------------------------------------- ideias (Central de Conteúdo) — leque "de cinema"
+const NOMES_FORMATO = { feed: "Feed", carrossel: "Carrossel", reels: "Reels", stories: "Stories", site: "Site / Blog", faq: "FAQ" };
+estado.captura = { formatos: [], texto: "" };
+estado.leque = { escopo: "semana", indice: 0 };
+const conteudo = () => (estado.dados && estado.dados.conteudo) || { semana: [], ideias: [], contadores: {}, formatos: [] };
+const listaDoLeque = () => (estado.leque.escopo === "semana" ? conteudo().semana : conteudo().ideias.filter((i) => i.situacao === "solta" || i.situacao === "aceita"));
+
+function cartaoLeque(i, n) {
+  const feita = i.situacao === "arquivada", aceita = i.situacao === "aceita";
+  const chips = Object.keys(NOMES_FORMATO).map((k) =>
+    `<button class="chip${(i.formatos || []).includes(k) ? " on" : ""}" data-formato="${k}" data-ideia="${esc(i.id)}">${NOMES_FORMATO[k]}</button>`).join("");
+  return `<div class="carta${feita ? " feita-c" : ""}" data-n="${n}">
+    <div><span class="pill c">${esc(i.serie || "Sem série")}</span>${i.prioridade === "alta" ? ' <span class="pill a">alta</span>' : ""}</div>
+    <h3>${esc(i.titulo)}</h3>
+    <div class="chips">${chips}</div>
+    <div class="carta-acoes">${feita ? '<span class="pill v">concluída</span>' : `
+      <button class="btn peq" data-ideia-acao="aceitar" data-ideia="${esc(i.id)}">${aceita ? "Aceita ✓" : "Aceitar"}</button>
+      <button class="btn o peq" data-ideia-acao="executado" data-ideia="${esc(i.id)}">Executado</button>
+      <button class="btn o peq" data-ideia-acao="adiar" data-ideia="${esc(i.id)}">Adiar</button>
+      <button class="btn o peq" data-ideia-acao="descartar" data-ideia="${esc(i.id)}">Descartar</button>`}</div></div>`;
+}
+
+function telaIdeias() {
+  const c = conteudo(), ct = c.contadores || {}, lista = listaDoLeque();
+  const todas = c.ideias.filter((i) => i.situacao !== "arquivada");
+  const captura = Object.keys(NOMES_FORMATO).map((k) =>
+    `<button class="chip${estado.captura.formatos.includes(k) ? " on" : ""}" data-cap-formato="${k}">${NOMES_FORMATO[k]}</button>`).join("");
+  return `<h1>Ideias</h1><div class="mini">${ct.ideias || 0} ideias · ${ct.planejados || 0} planejadas · ${ct.em_producao || 0} em produção · ${ct.publicados || 0} publicadas</div>
+    <div class="card" style="margin-top:12px"><textarea class="campo" id="ideia-texto" style="margin-top:0;min-height:74px" placeholder="Acabou de ter uma ideia? Escreva ou dite aqui…">${esc(estado.captura.texto)}</textarea>
+      <div class="chips" style="margin-top:8px">${captura}</div><button class="btn" data-acao="guardar-ideia">Guardar ideia</button></div>
+    <div class="seg"><button class="${estado.leque.escopo === "semana" ? "on" : ""}" data-escopo="semana">Da semana · ${c.concluidos || 0}/${c.total || 0}</button>
+      <button class="${estado.leque.escopo === "todas" ? "on" : ""}" data-escopo="todas">Todas abertas</button></div>
+    ${lista.length ? `<div class="leque"><div class="trilho" id="trilho">${lista.map(cartaoLeque).join("")}</div></div>
+      <div class="pontos" id="pontos">${lista.map((_, n) => `<i data-n="${n}"></i>`).join("")}</div>` : '<div class="vazio">Nenhuma ideia ainda. Anote a primeira acima, sem organizar agora.</div>'}
+    <h2 class="sec">Banco de ideias · ${todas.length}</h2>
+    ${todas.map((i) => `<div class="card"><div class="linha"><div class="t"><b>${esc(i.titulo)}</b><div class="p">${esc(i.serie || "Sem série")}${(i.formatos || []).length ? " · " + i.formatos.map((f) => NOMES_FORMATO[f] || f).join(", ") : ""}</div></div>
+      <span class="pill ${i.situacao === "aceita" ? "v" : i.situacao === "adiada" ? "a" : "c"}">${esc(i.situacao)}</span></div></div>`).join("") || '<div class="vazio">O banco está vazio.</div>'}`;
+}
+
+// Leque: scroll horizontal com snap; cada carta escala, gira e desfoca conforme a distância do centro.
+function ligarLeque() {
+  const trilho = $("#trilho"); if (!trilho) return;
+  const cartas = [...trilho.querySelectorAll(".carta")];
+  const centro = () => trilho.scrollLeft + trilho.clientWidth / 2;
+  const marcarPontos = () => document.querySelectorAll("#pontos i").forEach((p, n) => p.classList.toggle("on", n === estado.leque.indice));
+  const aplicar = () => {
+    let melhor = 0, menor = 1e9;
+    cartas.forEach((el, n) => {
+      const c = el.offsetLeft + el.offsetWidth / 2, d = (c - centro()) / el.offsetWidth;     // ±1 = uma carta de distância
+      const ad = Math.min(Math.abs(d), 2);
+      el.style.transform = `perspective(900px) rotateY(${(-d * 28).toFixed(1)}deg) scale(${(1 - ad * 0.14).toFixed(3)}) translateZ(${(-ad * 40).toFixed(0)}px)`;
+      el.style.opacity = Math.max(0.35, 1 - ad * 0.38).toFixed(2);
+      el.style.filter = ad > 0.35 ? `blur(${Math.min(ad * 2.2, 4).toFixed(1)}px)` : "none";
+      el.style.zIndex = String(10 - Math.round(ad * 3));
+      if (Math.abs(d) < menor) { menor = Math.abs(d); melhor = n; }
+    });
+    if (melhor !== estado.leque.indice) { estado.leque.indice = melhor; marcarPontos(); }
+  };
+  trilho.addEventListener("scroll", () => requestAnimationFrame(aplicar), { passive: true });
+  const alvo = cartas[Math.min(estado.leque.indice, cartas.length - 1)];
+  if (alvo) trilho.scrollLeft = alvo.offsetLeft - (trilho.clientWidth - alvo.offsetWidth) / 2;
+  aplicar();
+  marcarPontos();
+}
+
+function acaoIdeia(id, acao) {
+  const c = conteudo();
+  if (!c.ideias.concat(c.semana).some((i) => i.id === id)) return;
+  comando("acao_ideia", { ideia_id: id, acao }, () => {
+    const listas = [c.semana, c.ideias];
+    if (acao === "aceitar") listas.forEach((l) => l.forEach((i) => { if (i.id === id) i.situacao = "aceita"; }));
+    else if (acao === "executado") {
+      listas.forEach((l) => l.forEach((i) => { if (i.id === id) i.situacao = "arquivada"; }));
+      c.concluidos = c.semana.filter((i) => i.situacao === "arquivada").length;
+    } else { c.semana = c.semana.filter((i) => i.id !== id); c.ideias = c.ideias.filter((i) => i.id !== id); c.total = c.semana.length; }
+  });
+  avisar({ aceitar: "Ideia aceita.", executado: "Marcada como executada.", adiar: "Ideia adiada.", descartar: "Ideia descartada." }[acao]);
 }
 
 // ---------------------------------------------------------------- ações
@@ -346,6 +427,26 @@ document.addEventListener("click", async (e) => {
     else if (item && item.tipo === "pagar") { estado.aba = "financeiro"; estado.finSub = "pagar"; desenhar(); if (!estado.liberado) liberarFinanceiro(); }
     return;
   }
+  if ((el = q("[data-escopo]"))) { estado.leque.escopo = el.dataset.escopo; estado.leque.indice = 0; desenhar(); return; }
+  if ((el = q("[data-cap-formato]"))) {
+    const t = $("#ideia-texto"); if (t) estado.captura.texto = t.value;
+    const k = el.dataset.capFormato, l = estado.captura.formatos, i = l.indexOf(k);
+    if (i >= 0) l.splice(i, 1); else l.push(k);
+    desenhar(); return;
+  }
+  if ((el = q("[data-formato]"))) {
+    const id = el.dataset.ideia, k = el.dataset.formato, c = conteudo();
+    comando("alternar_formato_ideia", { ideia_id: id, formato: k }, () => {
+      [c.semana, c.ideias].forEach((l) => l.forEach((i) => {
+        if (i.id !== id) return;
+        i.formatos = i.formatos || [];
+        const p = i.formatos.indexOf(k);
+        if (p >= 0) i.formatos.splice(p, 1); else i.formatos.push(k);
+      }));
+    });
+    return;
+  }
+  if ((el = q("[data-ideia-acao]"))) { acaoIdeia(el.dataset.ideia, el.dataset.ideiaAcao); return; }
   if ((el = q("[data-acao]"))) {
     const a = el.dataset.acao;
     if (a === "atualizar") { await carregar(true); await enviarFila(); desenhar(); avisar(estado.demo ? "Modo demonstração." : "Atualizado."); }
@@ -359,6 +460,16 @@ document.addEventListener("click", async (e) => {
       const nova = { id: "novo-" + Date.now(), titulo: completo.split("\n")[0].slice(0, 80), texto: completo, projeto: codigo, atualizado: new Date().toISOString(), pendente: true };
       comando("criar_nota", { texto, projeto: codigo, local_id: nova.id }, () => { d.notas.unshift(nova); });
       avisar("Nota guardada. Vai pro Simplenote quando o Dudoo estiver aberto.");
+    }
+    else if (a === "guardar-ideia") {
+      const texto = (($("#ideia-texto") || {}).value || "").trim();
+      if (!texto) { avisar("Escreva a ideia antes de guardar."); return; }
+      const nova = { id: "novo-" + Date.now(), titulo: texto.split("\n")[0].slice(0, 90), serie: "", prioridade: "normal", situacao: "solta",
+        formatos: estado.captura.formatos.slice(), projeto: "", pecas: [], criado_em: new Date().toISOString().slice(0, 10), origem: "iphone" };
+      const c = conteudo();
+      comando("criar_ideia", { texto, formatos: nova.formatos, local_id: nova.id }, () => { c.ideias.unshift(nova); c.contadores.ideias = (c.contadores.ideias || 0) + 1; });
+      estado.captura = { formatos: [], texto: "" };
+      avisar("Ideia guardada. O Dudoo recebe assim que estiver aberto.");
     }
     else if (a === "liberar") liberarFinanceiro();
     else if (a === "ponto") { const dentro = d.usuario.ponto === "dentro"; comando("ponto", { tipo: dentro ? "saida" : "entrada" }, () => { d.usuario.ponto = dentro ? "fora" : "dentro"; }); avisar(dentro ? "Saída registrada." : "Entrada registrada."); }
