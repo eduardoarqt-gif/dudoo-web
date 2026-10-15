@@ -32,6 +32,7 @@ function normalizarFinanceiro(d) {
     if (!c.por_mes) c.por_mes = { [f.mes_atual]: { a_receber: c.a_receber || [], a_pagar: c.a_pagar || [] } };
     c.projecao = c.projecao || [];
   }
+  f.contas = Array.isArray(f.contas) ? f.contas : [];
   return d;
 }
 
@@ -87,6 +88,21 @@ async function enviarFila() {
   desenhar();
 }
 const pendentes = () => estado.fila.filter((i) => i.status === "pendente").length;
+
+const numeroBr = (v) => parseFloat(String(v || "").replace(/\./g, "").replace(",", "."));
+
+// Popup de baixo (folha): fica fora do #app, então redesenhar a tela não apaga o que a pessoa digitou.
+function fecharFolha() { const f = document.getElementById("folha"); if (f) f.remove(); }
+function abrirFolha(titulo, camposHtml, rotulo, aoConfirmar) {
+  fecharFolha();
+  const f = document.createElement("div");
+  f.id = "folha";
+  f.innerHTML = `<div class="folha-fundo" data-folha="fechar"></div><div class="folha-caixa"><h2>${esc(titulo)}</h2>${camposHtml}
+    <button class="btn" id="folha-ok">${esc(rotulo)}</button><button class="btn o" data-folha="fechar">Cancelar</button></div>`;
+  document.body.appendChild(f);
+  f.addEventListener("click", (e) => { if (e.target.closest('[data-folha="fechar"]')) fecharFolha(); });
+  document.getElementById("folha-ok").addEventListener("click", () => { if (aoConfirmar() !== false) fecharFolha(); });
+}
 
 function avisar(texto) {
   const a = $("#aviso"); a.textContent = texto; a.hidden = false;
@@ -265,8 +281,9 @@ function telaFinanceiro() {
       const pend = x.id && estado.fila.some((i) => i.status === "pendente" && i.payload.conta_id === x.id);
       const podeBaixar = x.id && !fechada && !(estado.fin === "pessoal" && estado.finSub === "pagar" && x.grupo !== "despesas");
       const rotuloData = x.status === "vencida" ? "Venceu" : fechada ? (estado.finSub === "receber" ? "Recebida" : "Paga") : "Vence";
-      return `<div class="card ${pend ? "pendente" : ""}"><div class="linha"><div class="t"><b>${esc(x.descricao)}</b><div class="p"><span style="color:${x.status === "vencida" ? "var(--verm)" : "inherit"}">${rotuloData} ${dataBr(x.venc)}</span>${x.projeto ? " · " + esc(x.projeto) : ""}${pend ? " · aguardando o Dudoo" : ""}</div></div><span class="val dir" style="${fechada ? "color:var(--texto2)" : ""}">${brl(x.valor)}</span></div>
-        ${fechada ? '<div class="p">✓ Baixa registrada</div>' : podeBaixar ? `<button class="acao" data-baixa="${esc(x.id)}">✓ ${estado.finSub === "receber" ? (x.rt ? "Marcar recebida" : "Dar baixa") : "Marcar paga"}</button>` : '<div class="p">Baixa pelo Dudoo (cartão/financiamento).</div>'}</div>`;
+      const podeDesfazer = x.id && fechada && !(estado.fin === "pessoal" && estado.finSub === "pagar" && x.grupo !== "despesas");
+      return `<div class="card ${fechada ? "fechada" : ""} ${pend ? "pendente" : ""}"><div class="linha"><div class="t"><b>${esc(x.descricao)}</b><div class="p"><span style="color:${x.status === "vencida" ? "var(--verm)" : "inherit"}">${rotuloData} ${dataBr(fechada && x.baixa_em ? x.baixa_em : x.venc)}</span>${x.projeto ? " · " + esc(x.projeto) : ""}${pend ? " · aguardando o Dudoo" : ""}</div></div><span class="val dir">${brl(x.valor)}</span></div>
+        ${fechada ? `<div class="rodape-baixa"><div class="p">✓ Baixa registrada</div>${podeDesfazer ? `<button class="desfaz" data-desfazer="${esc(x.id)}" aria-label="Desfazer baixa" title="Desfazer baixa">↶</button>` : ""}</div>` : podeBaixar ? `<button class="acao" data-baixa="${esc(x.id)}">✓ ${estado.finSub === "receber" ? (x.rt ? "Marcar recebida" : "Dar baixa") : "Marcar paga"}</button>` : '<div class="p">Baixa pelo Dudoo (cartão/financiamento).</div>'}</div>`;
     }).join("") || `<div class="vazio">Nada em ${esc(rotuloMes(mes))}.</div>`;
   }
   return `<h1>Financeiro</h1>
@@ -275,7 +292,7 @@ function telaFinanceiro() {
     <div class="kpis"><div class="kpi"><small>A receber</small><strong>${brl(soma(dadosMes.a_receber, aberta))}</strong><small>Recebido ${brl(soma(dadosMes.a_receber, (x) => !aberta(x)))}</small></div>
       <div class="kpi"><small>A pagar</small><strong>${brl(soma(dadosMes.a_pagar, aberta))}</strong><small>Pago ${brl(soma(dadosMes.a_pagar, (x) => !aberta(x)))}</small></div></div>
     <div class="seg">${subs.map(([k, n]) => `<button data-finsub="${k}" class="${estado.finSub === k ? "on" : ""}">${n}</button>`).join("")}</div>${corpo}
-    ${estado.finSub === "receber" ? '<button class="fab" data-acao="nova-receber">+ Conta a receber</button>' : ""}`;
+    ${estado.finSub === "receber" ? '<button class="fab" data-acao="nova-receber">+ Conta a receber</button>' : estado.finSub === "pagar" ? '<button class="fab" data-acao="nova-pagar">+ Conta a pagar</button>' : ""}`;
 }
 
 function blocoConexao() {
@@ -453,9 +470,33 @@ document.addEventListener("click", async (e) => {
     const pm = d.financeiro[estado.fin].por_mes[estado.mes] || { a_receber: [], a_pagar: [] };
     const lista = estado.finSub === "receber" ? pm.a_receber : pm.a_pagar, c = lista.find((x) => x.id === el.dataset.baixa);
     if (!c) return;
-    const tipo = estado.finSub === "receber" ? (c.rt ? "marcar_rt_recebida" : "marcar_conta_receber_recebida") : "marcar_conta_pagar_paga";
-    comando(tipo, { conta_id: c.id, projeto: c.projeto || "", escopo: estado.fin, data: new Date().toISOString().slice(0, 10) }, () => { c.status = estado.finSub === "receber" ? "recebida" : "paga"; });
-    avisar("Baixa registrada. O Dudoo aplica assim que estiver aberto.");
+    const receber = estado.finSub === "receber", escopo = estado.fin, hoje = new Date().toISOString().slice(0, 10);
+    const tipo = receber ? (c.rt ? "marcar_rt_recebida" : "marcar_conta_receber_recebida") : "marcar_conta_pagar_paga";
+    const contas = d.financeiro.contas || [];
+    // As mesmas perguntas do "Marcar pago" do Dudoo: de qual conta, data do pagamento e valor pago (pode diferir do lançado).
+    const campos = `<label class="rot">${receber ? "Em qual conta caiu o recebimento?" : "De qual conta foi o pagamento?"}</label>
+      <select class="campo" id="f-conta"><option value="">Não informar</option>${contas.map((n) => `<option>${esc(n)}</option>`).join("")}</select>
+      <label class="rot">${receber ? "Data do recebimento" : "Data do pagamento"}</label><input class="campo" id="f-data" type="date" value="${hoje}">
+      <label class="rot">${receber ? "Valor recebido (R$)" : "Valor pago (R$) — pode ser diferente do lançado"}</label>
+      <input class="campo" id="f-valor" inputmode="decimal" value="${esc(c.valor.toFixed(2).replace(".", ","))}">`;
+    abrirFolha(`${receber ? (c.rt ? "Marcar recebida" : "Dar baixa") : "Marcar paga"} — ${c.descricao}`, campos, "Confirmar baixa", () => {
+      const data = ($("#f-data").value || hoje), conta = $("#f-conta").value, valor = numeroBr($("#f-valor").value);
+      if (!(valor > 0)) { avisar("Valor inválido."); return false; }
+      const difere = Math.abs(valor - c.valor) > 0.005;
+      comando(tipo, { conta_id: c.id, projeto: c.projeto || "", escopo, data, conta_origem: conta, valor_pago: difere ? valor : 0 },
+        () => { c.status = receber ? "recebida" : "paga"; c.baixa_em = data; });
+      avisar("Baixa registrada. O Dudoo aplica assim que estiver aberto.");
+    });
+    return;
+  }
+  if ((el = q("[data-desfazer]"))) {
+    const pm = d.financeiro[estado.fin].por_mes[estado.mes] || { a_receber: [], a_pagar: [] };
+    const receber = estado.finSub === "receber", lista = receber ? pm.a_receber : pm.a_pagar, c = lista.find((x) => x.id === el.dataset.desfazer);
+    if (!c) return;
+    const natureza = receber ? (c.rt ? "rt" : "receber") : "pagar";
+    comando("desfazer_baixa", { conta_id: c.id, projeto: c.projeto || "", escopo: estado.fin, natureza },
+      () => { c.status = (c.venc && c.venc < new Date().toISOString().slice(0, 10)) ? "vencida" : "aberta"; c.baixa_em = ""; });
+    avisar("Baixa desfeita. O Dudoo aplica assim que estiver aberto.");
     return;
   }
   if ((el = q("[data-precisa]"))) {
@@ -538,14 +579,26 @@ document.addEventListener("click", async (e) => {
       comando("publicar_aviso", { projeto, texto: texto.trim() });
       avisar("Aviso enviado para publicação no portal.");
       if ($("#aviso-texto")) $("#aviso-texto").value = "";
-    } else if (a === "nova-receber") {
-      const descricao = window.prompt("Descrição da conta a receber"); if (!descricao) return;
-      const valor = parseFloat((window.prompt("Valor (R$)") || "").replace(/\./g, "").replace(",", ".")); if (!(valor > 0)) { avisar("Valor inválido."); return; }
-      const venc = window.prompt("Vencimento (AAAA-MM-DD)", new Date().toISOString().slice(0, 10)); if (!venc) return;
-      const nova = { id: "novo-" + Date.now(), descricao, valor, venc, status: "aberta", projeto: estado.projeto || "" };
-      comando("criar_conta_receber", { descricao, valor, vencimento: venc, projeto: nova.projeto, escopo: estado.fin, local_id: nova.id }, () => {
-        const pm = d.financeiro[estado.fin].por_mes[venc.slice(0, 7)];
-        if (pm) pm.a_receber.unshift(nova);
+    } else if (a === "nova-receber" || a === "nova-pagar") {
+      const receber = a === "nova-receber", escopo = estado.fin, hoje = new Date().toISOString().slice(0, 10);
+      const pedeProjeto = receber && escopo === "escritorio";
+      const projetos = (d.projetos || []).map((p) => `<option value="${esc(p.codigo)}" ${p.id === estado.projeto ? "selected" : ""}>${esc(p.codigo)} ${esc(p.nome)}</option>`).join("");
+      const campos = `${pedeProjeto ? `<label class="rot">Projeto</label><select class="campo" id="n-projeto">${projetos}</select>` : ""}
+        <label class="rot">Descrição</label><input class="campo" id="n-desc" placeholder="${receber ? "Ex.: Honorários — parcela 2" : "Ex.: Conta de luz"}">
+        <label class="rot">Valor (R$)</label><input class="campo" id="n-valor" inputmode="decimal" placeholder="0,00">
+        <label class="rot">Vencimento</label><input class="campo" id="n-venc" type="date" value="${hoje}">`;
+      abrirFolha(`${receber ? "Nova conta a receber" : "Nova conta a pagar"} · ${escopo === "pessoal" ? "Pessoal" : "Escritório"}`, campos, "Criar", () => {
+        const descricao = ($("#n-desc").value || "").trim(), valor = numeroBr($("#n-valor").value), venc = $("#n-venc").value;
+        const projeto = pedeProjeto ? ($("#n-projeto").value || "") : "";
+        if (!descricao) { avisar("Escreva a descrição."); return false; }
+        if (!(valor > 0)) { avisar("Valor inválido."); return false; }
+        if (!venc) { avisar("Escolha o vencimento."); return false; }
+        const nova = { id: "novo-" + Date.now(), descricao, valor, venc, status: venc < hoje ? "vencida" : "aberta", projeto };
+        comando(receber ? "criar_conta_receber" : "criar_conta_pagar", { descricao, valor, vencimento: venc, projeto, escopo, local_id: nova.id }, () => {
+          const pm = d.financeiro[escopo].por_mes[venc.slice(0, 7)];
+          if (pm) (receber ? pm.a_receber : pm.a_pagar).unshift(nova);
+        });
+        avisar("Conta criada. O Dudoo grava assim que estiver aberto.");
       });
     } else if (a === "colar-link") {
       const texto = (($("#cfg-link") || {}).value || "").trim();
