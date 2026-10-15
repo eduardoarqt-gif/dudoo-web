@@ -304,7 +304,7 @@ function telaFinanceiro() {
   estado.mes = mes;
   const idx = meses.indexOf(mes), dadosMes = c.por_mes[mes] || { a_receber: [], a_pagar: [] };
   const aberta = (x) => x.status !== "paga" && x.status !== "recebida";
-  const soma = (l, f) => l.filter(f).reduce((s, x) => s + x.valor, 0);
+  const soma = (l, f) => l.filter((x) => !x.fora_resumo && f(x)).reduce((s, x) => s + x.valor, 0);
   const subs = [["receber", "A receber"], ["pagar", "A pagar"], ["projecao", "Projeção"]];
   let corpo = "";
   if (estado.finSub === "projecao") {
@@ -314,11 +314,13 @@ function telaFinanceiro() {
     corpo = lista.map((x) => {
       const fechada = !aberta(x);
       const pend = x.id && estado.fila.some((i) => i.status === "pendente" && i.payload.conta_id === x.id);
-      const podeBaixar = x.id && !fechada && !(estado.fin === "pessoal" && estado.finSub === "pagar" && x.grupo !== "despesas");
+      const semBaixa = estado.fin === "pessoal" && estado.finSub === "pagar" && x.grupo === "gilberto";   // Contas Gilberto: só consulta
+      const podeBaixar = x.id && !fechada && !semBaixa;
       const rotuloData = x.status === "vencida" ? "Venceu" : fechada ? (estado.finSub === "receber" ? "Recebida" : "Paga") : "Vence";
-      const podeDesfazer = x.id && fechada && !(estado.fin === "pessoal" && estado.finSub === "pagar" && x.grupo !== "despesas");
-      return `<div class="card ${fechada ? "fechada" : ""} ${pend ? "pendente" : ""}"><div class="linha"><div class="t"><b>${esc(x.descricao)}</b><div class="p"><span style="color:${x.status === "vencida" ? "var(--verm)" : "inherit"}">${rotuloData} ${dataBr(fechada && x.baixa_em ? x.baixa_em : x.venc)}</span>${x.projeto ? " · " + esc(x.projeto) : ""}${pend ? " · aguardando o Dudoo" : ""}</div></div><span class="val dir">${brl(x.valor)}</span></div>
-        ${fechada ? `<div class="rodape-baixa"><div class="p">✓ Baixa registrada</div>${podeDesfazer ? `<button class="desfaz" data-desfazer="${esc(x.id)}" aria-label="Desfazer baixa" title="Desfazer baixa">↶</button>` : ""}</div>` : podeBaixar ? `<button class="acao" data-baixa="${esc(x.id)}">✓ ${estado.finSub === "receber" ? (x.rt ? "Marcar recebida" : "Dar baixa") : "Marcar paga"}</button>` : '<div class="p">Baixa pelo Dudoo (cartão/financiamento).</div>'}</div>`;
+      const podeDesfazer = x.id && fechada && !semBaixa;
+      return `<div class="card ${fechada ? "fechada" : ""} ${pend ? "pendente" : ""}"><div class="linha"><div class="t"><b>${esc(x.descricao)}</b><div class="p"><span style="color:${x.status === "vencida" ? "var(--verm)" : "inherit"}">${rotuloData} ${dataBr(fechada && x.baixa_em ? x.baixa_em : x.venc)}</span>${x.projeto ? " · " + esc(x.projeto) : ""}${pend ? " · aguardando o Dudoo" : ""}${x.fora_resumo ? " · fora do total" : ""}</div></div><span class="val dir">${brl(x.valor)}</span></div>
+        ${(x.itens || []).length ? `<details class="itens"><summary class="p">${x.itens.length} compra(s)</summary>${x.itens.map((i) => `<div class="p">${esc(i.descricao)}${i.parcela ? " (" + esc(i.parcela) + ")" : ""} · ${brl(i.valor)}</div>`).join("")}</details>` : ""}
+        ${fechada ? `<div class="rodape-baixa"><div class="p">✓ Baixa registrada</div>${podeDesfazer ? `<button class="desfaz" data-desfazer="${esc(x.id)}" aria-label="Desfazer baixa" title="Desfazer baixa">↶</button>` : ""}</div>` : podeBaixar ? `<button class="acao" data-baixa="${esc(x.id)}">✓ ${estado.finSub === "receber" ? (x.rt ? "Marcar recebida" : "Dar baixa") : "Marcar paga"}</button>` : '<div class="p">${semBaixa ? "Conta de terceiro: só consulta." : x.grupo === "cartoes" ? "Fatura estimada: baixa pelo Dudoo." : ""}</div>'}</div>`;
     }).join("") || `<div class="vazio">Nada em ${esc(rotuloMes(mes))}.</div>`;
   }
   return `<h1>Financeiro</h1>
@@ -518,7 +520,7 @@ document.addEventListener("click", async (e) => {
       const data = ($("#f-data").value || hoje), conta = $("#f-conta").value, valor = numeroBr($("#f-valor").value);
       if (!(valor > 0)) { avisar("Valor inválido."); return false; }
       const difere = Math.abs(valor - c.valor) > 0.005;
-      comando(tipo, { conta_id: c.id, projeto: c.projeto || "", escopo, data, conta_origem: conta, valor_pago: difere ? valor : 0 },
+      comando(tipo, { conta_id: c.id, projeto: c.projeto || "", escopo, grupo: c.grupo || "", data, conta_origem: conta, valor_pago: difere ? valor : 0 },
         () => { c.status = receber ? "recebida" : "paga"; c.baixa_em = data; });
       avisar("Baixa registrada. O Dudoo aplica assim que estiver aberto.");
     });
@@ -529,7 +531,7 @@ document.addEventListener("click", async (e) => {
     const receber = estado.finSub === "receber", lista = receber ? pm.a_receber : pm.a_pagar, c = lista.find((x) => x.id === el.dataset.desfazer);
     if (!c) return;
     const natureza = receber ? (c.rt ? "rt" : "receber") : "pagar";
-    comando("desfazer_baixa", { conta_id: c.id, projeto: c.projeto || "", escopo: estado.fin, natureza },
+    comando("desfazer_baixa", { conta_id: c.id, projeto: c.projeto || "", escopo: estado.fin, grupo: c.grupo || "", natureza },
       () => { c.status = (c.venc && c.venc < new Date().toISOString().slice(0, 10)) ? "vencida" : "aberta"; c.baixa_em = ""; });
     avisar("Baixa desfeita. O Dudoo aplica assim que estiver aberto.");
     return;
