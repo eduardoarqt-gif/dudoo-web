@@ -312,7 +312,8 @@ function desenhar() {
 
 // ---------------------------------------------------------------- ideias (Central de Conteúdo) — leque "de cinema"
 const NOMES_FORMATO = { feed: "Feed", carrossel: "Carrossel", reels: "Reels", stories: "Stories", site: "Site / Blog", faq: "FAQ" };
-estado.captura = { formatos: [], texto: "" };
+estado.captura = { formatos: [], texto: "", imagens: [], link: "", mostrarLink: false };
+estado.alvoImagem = "";
 estado.leque = { escopo: "semana", indice: 0 };
 const conteudo = () => (estado.dados && estado.dados.conteudo) || { semana: [], ideias: [], contadores: {}, formatos: [] };
 const listaDoLeque = () => (estado.leque.escopo === "semana" ? conteudo().semana : conteudo().ideias.filter((i) => i.situacao === "solta" || i.situacao === "aceita"));
@@ -324,12 +325,14 @@ function cartaoLeque(i, n) {
   return `<div class="carta${feita ? " feita-c" : ""}" data-n="${n}">
     <div><span class="pill c">${esc(i.serie || "Sem série")}</span>${i.prioridade === "alta" ? ' <span class="pill a">alta</span>' : ""}</div>
     <h3>${esc(i.titulo)}</h3>
+    ${i.miniatura ? `<img class="mini-ideia" src="${i.miniatura}" alt="">` : ""}
     <div class="chips">${chips}</div>
     <div class="carta-acoes">${feita ? '<span class="pill v">concluída</span>' : `
       <button class="btn peq" data-ideia-acao="aceitar" data-ideia="${esc(i.id)}">${aceita ? "Aceita ✓" : "Aceitar"}</button>
       <button class="btn o peq" data-ideia-acao="executado" data-ideia="${esc(i.id)}">Executado</button>
       <button class="btn o peq" data-ideia-acao="adiar" data-ideia="${esc(i.id)}">Adiar</button>
-      <button class="btn o peq" data-ideia-acao="descartar" data-ideia="${esc(i.id)}">Descartar</button>`}</div></div>`;
+      <button class="btn o peq" data-ideia-acao="descartar" data-ideia="${esc(i.id)}">Descartar</button>
+      <button class="btn o peq" data-ideia-acao="imagem" data-ideia="${esc(i.id)}">+ Imagem</button>`}</div></div>`;
 }
 
 function telaIdeias() {
@@ -339,13 +342,22 @@ function telaIdeias() {
     `<button class="chip${estado.captura.formatos.includes(k) ? " on" : ""}" data-cap-formato="${k}">${NOMES_FORMATO[k]}</button>`).join("");
   return `<h1>Ideias</h1><div class="mini">${ct.ideias || 0} ideias · ${ct.planejados || 0} planejadas · ${ct.em_producao || 0} em produção · ${ct.publicados || 0} publicadas</div>
     <div class="card" style="margin-top:12px"><textarea class="campo" id="ideia-texto" style="margin-top:0;min-height:74px" placeholder="Acabou de ter uma ideia? Escreva ou dite aqui…">${esc(estado.captura.texto)}</textarea>
+      <div class="cap-barra">
+        <button class="cap-ic" data-acao="cap-mic" aria-label="Ditar"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0M12 17v4"/></svg></button>
+        <button class="cap-ic" data-acao="cap-foto" aria-label="Imagem"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-2h6l2 2h3v11H4Z"/><circle cx="12" cy="13" r="3.2"/></svg></button>
+        <button class="cap-ic${estado.captura.mostrarLink || estado.captura.link ? " on" : ""}" data-acao="cap-link" aria-label="Link"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1"/></svg></button>
+        <input type="file" id="ideia-arquivo" accept="image/*" multiple hidden><input type="file" id="ideia-arquivo-card" accept="image/*" hidden>
+      </div>
+      ${estado.captura.mostrarLink || estado.captura.link ? `<input class="campo" id="ideia-link" inputmode="url" placeholder="Cole o link (matéria, post, referência)" value="${esc(estado.captura.link)}">` : ""}
+      ${estado.captura.imagens.length ? `<div class="cap-fotos">${estado.captura.imagens.map((im, n) =>
+        `<div class="cap-foto"><img src="${im}" alt=""><button data-acao="cap-remover" data-n="${n}" aria-label="Remover">×</button></div>`).join("")}</div>` : ""}
       <div class="chips" style="margin-top:8px">${captura}</div><button class="btn" data-acao="guardar-ideia">Guardar ideia</button></div>
     <div class="seg"><button class="${estado.leque.escopo === "semana" ? "on" : ""}" data-escopo="semana">Da semana · ${c.concluidos || 0}/${c.total || 0}</button>
       <button class="${estado.leque.escopo === "todas" ? "on" : ""}" data-escopo="todas">Todas abertas</button></div>
     ${lista.length ? `<div class="leque"><div class="trilho" id="trilho">${lista.map(cartaoLeque).join("")}</div></div>
       <div class="pontos" id="pontos">${lista.map((_, n) => `<i data-n="${n}"></i>`).join("")}</div>` : '<div class="vazio">Nenhuma ideia ainda. Anote a primeira acima, sem organizar agora.</div>'}
     <h2 class="sec">Banco de ideias · ${todas.length}</h2>
-    ${todas.map((i) => `<div class="card"><div class="linha"><div class="t"><b>${esc(i.titulo)}</b><div class="p">${esc(i.serie || "Sem série")}${(i.formatos || []).length ? " · " + i.formatos.map((f) => NOMES_FORMATO[f] || f).join(", ") : ""}</div></div>
+    ${todas.map((i) => `<div class="card"><div class="linha">${i.miniatura ? `<img class="mini-banco" src="${i.miniatura}" alt="">` : ""}<div class="t"><b>${esc(i.titulo)}</b><div class="p">${esc(i.serie || "Sem série")}${(i.formatos || []).length ? " · " + i.formatos.map((f) => NOMES_FORMATO[f] || f).join(", ") : ""}</div></div>
       <span class="pill ${i.situacao === "aceita" ? "v" : i.situacao === "adiada" ? "a" : "c"}">${esc(i.situacao)}</span></div></div>`).join("") || '<div class="vazio">O banco está vazio.</div>'}`;
 }
 
@@ -375,7 +387,33 @@ function ligarLeque() {
   marcarPontos();
 }
 
+// Foto do iPhone é grande: reduz pra caber num comando (limite do item no Wix ~500 KB) — 1280 px, JPEG, abaixo de ~330 KB.
+function comprimirImagem(arquivo) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(arquivo), img = new Image();
+    img.onload = () => {
+      let lado = 1280, q = 0.74, saida = "";
+      for (let t = 0; t < 6; t++) {
+        const f = Math.min(1, lado / Math.max(img.width, img.height)), c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(img.width * f)); c.height = Math.max(1, Math.round(img.height * f));
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        saida = c.toDataURL("image/jpeg", q);
+        if (saida.length * 0.75 < 330000) break;
+        lado = Math.round(lado * 0.8); q = Math.max(0.5, q - 0.06);
+      }
+      URL.revokeObjectURL(url); resolve(saida);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("imagem")); };
+    img.src = url;
+  });
+}
+
 function acaoIdeia(id, acao) {
+  if (acao === "imagem") {
+    estado.alvoImagem = id;
+    const campo = $("#ideia-arquivo-card"); if (campo) { campo.value = ""; campo.click(); }
+    return;
+  }
   const c = conteudo();
   if (!c.ideias.concat(c.semana).some((i) => i.id === id)) return;
   comando("acao_ideia", { ideia_id: id, acao }, () => {
@@ -461,15 +499,36 @@ document.addEventListener("click", async (e) => {
       comando("criar_nota", { texto, projeto: codigo, local_id: nova.id }, () => { d.notas.unshift(nova); });
       avisar("Nota guardada. Vai pro Simplenote quando o Dudoo estiver aberto.");
     }
+    else if (a === "cap-mic") {
+      const t = $("#ideia-texto"); if (t) t.focus();
+      avisar("Toque no microfone do teclado do iPhone para ditar.");
+    }
+    else if (a === "cap-foto") { const campo = $("#ideia-arquivo"); if (campo) { campo.value = ""; campo.click(); } }
+    else if (a === "cap-link") {
+      const t = $("#ideia-texto"); if (t) estado.captura.texto = t.value;
+      estado.captura.mostrarLink = !estado.captura.mostrarLink; desenhar();
+      setTimeout(() => { const l = $("#ideia-link"); if (l) l.focus(); }, 50);
+    }
+    else if (a === "cap-remover") {
+      const t = $("#ideia-texto"); if (t) estado.captura.texto = t.value;
+      estado.captura.imagens.splice(Number(el.dataset.n), 1); desenhar();
+    }
     else if (a === "guardar-ideia") {
-      const texto = (($("#ideia-texto") || {}).value || "").trim();
+      let texto = (($("#ideia-texto") || {}).value || "").trim();
+      const link = (($("#ideia-link") || {}).value || estado.captura.link || "").trim();
+      const imagens = estado.captura.imagens.slice();
+      if (!texto && link) texto = link;
+      if (!texto && imagens.length) texto = "Ideia com imagem";
       if (!texto) { avisar("Escreva a ideia antes de guardar."); return; }
-      const nova = { id: "novo-" + Date.now(), titulo: texto.split("\n")[0].slice(0, 90), serie: "", prioridade: "normal", situacao: "solta",
-        formatos: estado.captura.formatos.slice(), projeto: "", pecas: [], criado_em: new Date().toISOString().slice(0, 10), origem: "iphone" };
+      const corpo = link && texto !== link ? texto + String.fromCharCode(10) + link : texto;
+      const nova = { id: "novo-" + Date.now(), titulo: texto.split(String.fromCharCode(10))[0].slice(0, 90), serie: "", prioridade: "normal",
+        situacao: "solta", formatos: estado.captura.formatos.slice(), projeto: "", pecas: [], criado_em: new Date().toISOString().slice(0, 10),
+        origem: "iphone", miniatura: imagens[0] || "" };
       const c = conteudo();
-      comando("criar_ideia", { texto, formatos: nova.formatos, local_id: nova.id }, () => { c.ideias.unshift(nova); c.contadores.ideias = (c.contadores.ideias || 0) + 1; });
-      estado.captura = { formatos: [], texto: "" };
-      avisar("Ideia guardada. O Dudoo recebe assim que estiver aberto.");
+      comando("criar_ideia", { texto: corpo, formatos: nova.formatos, local_id: nova.id }, () => { c.ideias.unshift(nova); c.contadores.ideias = (c.contadores.ideias || 0) + 1; });
+      imagens.forEach((im, n) => comando("anexar_imagem_ideia", { local_id: nova.id, imagem: im, ordem: n }));
+      estado.captura = { formatos: [], texto: "", imagens: [], link: "", mostrarLink: false };
+      avisar(imagens.length ? "Ideia e imagem guardadas. O Dudoo recebe assim que estiver aberto." : "Ideia guardada. O Dudoo recebe assim que estiver aberto.");
     }
     else if (a === "liberar") liberarFinanceiro();
     else if (a === "ponto") { const dentro = d.usuario.ponto === "dentro"; comando("ponto", { tipo: dentro ? "saida" : "entrada" }, () => { d.usuario.ponto = dentro ? "fora" : "dentro"; }); avisar(dentro ? "Saída registrada." : "Entrada registrada."); }
@@ -496,8 +555,27 @@ document.addEventListener("click", async (e) => {
     } else if (a === "whatsapp-projeto") avisar("Abre o WhatsApp do cliente quando o Dudoo estiver conectado.");
   }
 });
-document.addEventListener("change", (e) => {
-  if (e.target && e.target.id === "nota-filtro") { estado.filtroNotas = e.target.value; desenhar(); }
+document.addEventListener("change", async (e) => {
+  if (e.target && e.target.id === "nota-filtro") { estado.filtroNotas = e.target.value; desenhar(); return; }
+  if (e.target && e.target.id === "ideia-arquivo") {
+    const t = $("#ideia-texto"); if (t) estado.captura.texto = t.value;
+    const l = $("#ideia-link"); if (l) estado.captura.link = l.value;
+    for (const arquivo of [...(e.target.files || [])].slice(0, 4 - estado.captura.imagens.length)) {
+      try { estado.captura.imagens.push(await comprimirImagem(arquivo)); } catch (_) { avisar("Não consegui ler essa imagem."); }
+    }
+    desenhar(); return;
+  }
+  if (e.target && e.target.id === "ideia-arquivo-card" && e.target.files && e.target.files[0] && estado.alvoImagem) {
+    const id = estado.alvoImagem; estado.alvoImagem = "";
+    try {
+      const im = await comprimirImagem(e.target.files[0]);
+      const c = conteudo(), local = id.startsWith("novo-");
+      comando("anexar_imagem_ideia", local ? { local_id: id, imagem: im } : { ideia_id: id, imagem: im }, () => {
+        [c.semana, c.ideias].forEach((lista) => lista.forEach((i) => { if (i.id === id && !i.miniatura) i.miniatura = im; }));
+      });
+      avisar("Imagem anexada à ideia.");
+    } catch (_) { avisar("Não consegui ler essa imagem."); }
+  }
 });
 document.addEventListener("submit", (e) => {
   const f = e.target.closest("[data-form='pergunta']"); if (!f) return;
