@@ -170,6 +170,7 @@ function telaHoje() {
   const hora = hoje.getHours(), saud = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
   return `<div class="topo"><div><h1>${saud}, ${esc(d.usuario.nome)}!</h1><div class="mini">${esc(data)} · ${d.projetos.filter((p) => p.estado === "ativo").length} projetos ativos</div>${estado.demo ? '<span class="demo">dados de exemplo</span>' : ""}</div>
     <div class="topo-botoes"><button class="atualizar" data-aba-ir="notas" aria-label="Notas">Notas${novasNotas() ? `<span class="nbadge">${novasNotas()}</span>` : ""}</button>
+    <button class="atualizar" data-aba-ir="leads" aria-label="Leads">Leads${leadsDevidos() ? `<span class="nbadge">${leadsDevidos()}</span>` : ""}</button>
     <button class="atualizar" data-acao="atualizar">Atualizar</button></div></div>
     <form class="perg" data-form="pergunta"><input id="pergunta" placeholder="Pergunte ou peça algo ao Dudoo…" autocomplete="off"><button>Enviar</button></form>
     ${estado.demo ? '<div class="card toque" data-aba-ir="mais"><div class="t"><b>Conectar ao Dudoo</b><div class="p">Você está vendo dados de exemplo. Toque para colar o link de conexão.</div></div></div>' : ""}
@@ -242,6 +243,40 @@ function telaNotas() {
   return `<button class="voltar" data-acao="voltar-hoje">‹ Hoje</button><h1>Notas</h1><div class="mini">Sincronizadas com o Simplenote · etiqueta = número do projeto</div>
     <select class="campo" id="nota-filtro">${opcoes}</select>${blocoNotas(filtro === "__todas" ? undefined : filtro)}`;
 }
+
+// ---------------------------------------------------------------- leads (WhatsApp com texto pronto + "Enviei?")
+const CHAVE_LEAD_AGUARDA = "dudoo_web_lead_aguarda";
+const leadsLista = () => (estado.dados && estado.dados.leads) || [];
+const leadsDevidos = () => leadsLista().filter((l) => l.devido).length;
+const rotuloStatus = (s) => String(s || "").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+function linkWhatsapp(tel, texto) {
+  let n = String(tel || "").replace(/\D/g, "");
+  if (n.length === 10 || n.length === 11) n = "55" + n;
+  return "https://wa.me/" + n + (texto ? "?text=" + encodeURIComponent(texto) : "");
+}
+function telaLeads() {
+  const aguarda = ler(CHAVE_LEAD_AGUARDA, null);
+  const lista = leadsLista();
+  const cartao = (l) => `<div class="card"><div class="linha"><div class="t"><b>${esc(l.nome)}</b><div class="p">${esc(rotuloStatus(l.status))}${l.origem ? " · " + esc(l.origem) : ""}${l.ultimo_contato ? " · último contato " + esc(l.ultimo_contato.split("-").reverse().join("/")) : " · sem contato"}</div></div>${l.devido ? `<span class="pill c dir">MSG ${l.numero}</span>` : ""}</div>
+    ${l.devido && l.texto ? `<div class="p" style="margin:6px 0">${esc(l.texto.slice(0, 160))}${l.texto.length > 160 ? "…" : ""}</div>` : ""}
+    ${l.telefone ? `<button class="btn peq" data-lead-wa="${esc(l.id)}">WhatsApp${l.devido ? " com a mensagem" : ""}</button>` : '<div class="p">Sem telefone cadastrado.</div>'}</div>`;
+  return `<button class="voltar" data-acao="voltar-hoje">‹ Hoje</button><h1>Leads</h1><div class="mini">${lista.length} em andamento · ${leadsDevidos()} com follow-up hoje</div>
+    ${aguarda ? `<div class="card toque" data-lead-confirmar="1"><div class="t"><b>Você enviou a mensagem para ${esc(aguarda.nome)}?</b><div class="p">Toque para confirmar e registrar o contato.</div></div></div>` : ""}
+    ${lista.map(cartao).join("") || '<div class="vazio">Nenhum lead em andamento.</div>'}`;
+}
+function perguntarEnviei() {
+  const a = ler(CHAVE_LEAD_AGUARDA, null);
+  if (!a || document.getElementById("folha")) return;
+  abrirFolha(`Enviou a mensagem para ${a.nome}?`, a.numero ? `<div class="p">Mensagem ${a.numero} do follow-up.</div>` : "", "Sim, enviei", () => {
+    if (a.numero) comando("lead_followup_enviado", { lead_id: a.id, numero: a.numero }, () => {
+      const l = leadsLista().find((x) => x.id === a.id);
+      if (l) { l.devido = false; l.ultimo_contato = new Date().toISOString().slice(0, 10); l.etapa = a.numero; }
+    });
+    gravar(CHAVE_LEAD_AGUARDA, null);
+    avisar(a.numero ? "Contato registrado." : "Ok.");
+  });
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && ler(CHAVE_LEAD_AGUARDA, null)) perguntarEnviei(); });
 
 function telaPortal() {
   const d = estado.dados.portal, abas = [["atividade", "Atividade"], ["acessos", "Acessos"], ["aviso", "Avisos"]];
@@ -319,7 +354,7 @@ function telaSemDados() {
 function desenhar() {
   if (!estado.dados) { $("#app").innerHTML = telaSemDados(); desenharAbas(); return; }
   if (!notasVistasEm()) marcarNotasVistas();             // 1ª vez: o que já existe não conta como "nova"
-  const telas = { hoje: telaHoje, projetos: telaProjetos, ideias: telaIdeias, portal: telaPortal, financeiro: telaFinanceiro, mais: telaMais, notas: telaNotas };
+  const telas = { hoje: telaHoje, projetos: telaProjetos, ideias: telaIdeias, portal: telaPortal, financeiro: telaFinanceiro, mais: telaMais, notas: telaNotas, leads: telaLeads };
   const y = window.scrollY;
   $("#app").innerHTML = telas[estado.aba]();
   desenharAbas();
@@ -499,9 +534,15 @@ document.addEventListener("click", async (e) => {
     avisar("Baixa desfeita. O Dudoo aplica assim que estiver aberto.");
     return;
   }
+  if ((el = q("[data-lead-wa]"))) {
+    const l = leadsLista().find((x) => x.id === el.dataset.leadWa);
+    if (l) { gravar(CHAVE_LEAD_AGUARDA, { id: l.id, nome: l.nome, numero: l.devido ? l.numero : 0 }); window.open(linkWhatsapp(l.telefone, l.devido ? l.texto : ""), "_blank"); }
+    return;
+  }
+  if (q("[data-lead-confirmar]")) { perguntarEnviei(); return; }
   if ((el = q("[data-precisa]"))) {
     const item = d.hoje.precisa.find((x) => x.id === el.dataset.precisa);
-    if (item && item.tipo === "lead" && item.telefone) { window.open("https://wa.me/" + String(item.telefone).replace(/\D/g, ""), "_blank"); }
+    if (item && item.tipo === "lead") { estado.aba = "leads"; desenhar(); window.scrollTo(0, 0); }
     else if (item && item.projeto) { estado.aba = "projetos"; estado.projeto = item.projeto; estado.subProjeto = "resumo"; desenhar(); }
     else if (item && item.tipo === "pagar") { estado.aba = "financeiro"; estado.finSub = "pagar"; desenhar(); if (!estado.liberado) liberarFinanceiro(); }
     return;
