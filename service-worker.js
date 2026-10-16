@@ -1,5 +1,5 @@
 // Dudoo Web — service worker: guarda o app (shell) para abrir offline; os dados vêm da rede e caem no cache local do app.
-const VERSAO = "dudoo-web-v11";
+const VERSAO = "dudoo-web-v12";
 const ARQUIVOS = ["./", "index.html", "styles.css", "app.js", "demo.js", "manifest.webmanifest", "icon.svg", "icon-maskable.svg"];
 
 self.addEventListener("install", (e) => {

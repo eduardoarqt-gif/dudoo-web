@@ -52,6 +52,7 @@ details.nota .p{display:block}
 .val{font-variant-numeric:tabular-nums;font-weight:500;white-space:nowrap}
 .btn{display:block;width:100%;text-align:center;background:var(--bronze);color:var(--sobre-bronze);border:0;border-radius:9px;padding:12px;font:inherit;font-weight:500;margin-top:10px}
 .btn.o{background:transparent;color:var(--texto);border:1px solid var(--borda)}
+.btn.atalho{margin:2px 0 6px;padding:10px;font-size:14px}
 .btn.peq{display:inline-block;width:auto;padding:7px 12px;font-size:13px;margin:8px 8px 0 0}
 .acao{color:var(--verde);font-weight:600;font-size:13px;background:none;border:0;padding:6px 0 0;font:inherit;font-weight:600}
 .fab{position:fixed;right:16px;bottom:calc(var(--aba-h) + env(safe-area-inset-bottom) + 14px);background:var(--bronze);color:var(--sobre-bronze);border:0;

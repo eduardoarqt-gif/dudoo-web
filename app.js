@@ -173,6 +173,7 @@ function telaHoje() {
     <button class="atualizar" data-aba-ir="leads" aria-label="Leads">Leads${leadsDevidos() ? `<span class="nbadge">${leadsDevidos()}</span>` : ""}</button>
     <button class="atualizar" data-acao="atualizar">Atualizar</button></div></div>
     <form class="perg" data-form="pergunta"><input id="pergunta" placeholder="Pergunte ou peça algo ao Dudoo…" autocomplete="off"><button>Enviar</button></form>
+    <button class="btn o atalho" data-acao="nova-tarefa">+ Nova tarefa</button>
     ${estado.demo ? '<div class="card toque" data-aba-ir="mais"><div class="t"><b>Conectar ao Dudoo</b><div class="p">Você está vendo dados de exemplo. Toque para colar o link de conexão.</div></div></div>' : ""}
     ${estado.erroConexao ? `<div class="card pendente"><div class="p" style="margin:0">${esc(estado.erroConexao)} Mostrando os últimos dados.</div></div>` : ""}
     <h2 class="sec">Precisa de você · ${d.hoje.precisa.length}</h2>
@@ -621,6 +622,22 @@ document.addEventListener("click", async (e) => {
       comando("publicar_aviso", { projeto, texto: texto.trim() });
       avisar("Aviso enviado para publicação no portal.");
       if ($("#aviso-texto")) $("#aviso-texto").value = "";
+    } else if (a === "nova-tarefa") {
+      const hoje = new Date().toISOString().slice(0, 10);
+      const projetos = (d.projetos || []).filter((p) => p.estado === "ativo")
+        .map((p) => `<option value="${esc(p.codigo)}" ${p.id === estado.projeto ? "selected" : ""}>${esc(p.codigo)} ${esc(p.nome)}</option>`).join("");
+      const campos = `<label class="rot">Tarefa</label><input class="campo" id="t-titulo" placeholder="Ex.: Ligar para o fornecedor" autocomplete="off">
+        <label class="rot">Projeto</label><select class="campo" id="t-projeto"><option value="">Sem projeto</option>${projetos}</select>
+        <label class="rot">Prazo (opcional)</label><input class="campo" id="t-prazo" type="date">`;
+      abrirFolha("Nova tarefa", campos, "Criar", () => {
+        const titulo = ($("#t-titulo").value || "").trim(), codigo = $("#t-projeto").value || "", prazo = $("#t-prazo").value || "";
+        if (!titulo) { avisar("Escreva a tarefa."); return false; }
+        const proj = d.projetos.find((x) => x.codigo === codigo);
+        const nova = { id: "novo-" + Date.now(), titulo, feita: false, prazo };
+        comando("criar_tarefa", { titulo, projeto: codigo, prazo, local_id: nova.id }, () => { if (proj) proj.tarefas.unshift(nova); });
+        avisar(proj ? `Tarefa criada em ${proj.codigo}. O Dudoo grava assim que estiver aberto.` : "Tarefa criada. O Dudoo grava assim que estiver aberto.");
+      });
+      setTimeout(() => { const t = $("#t-titulo"); if (t) t.focus(); }, 60);
     } else if (a === "nova-receber" || a === "nova-pagar") {
       const receber = a === "nova-receber", escopo = estado.fin, hoje = new Date().toISOString().slice(0, 10);
       const pedeProjeto = receber && escopo === "escritorio";
