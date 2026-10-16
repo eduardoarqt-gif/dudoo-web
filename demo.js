@@ -3,6 +3,8 @@ window.DUDOO_DEMO = {
   atualizado_em: new Date().toISOString(),
   usuario: { nome: "Eduardo", ponto: "fora" },
   hoje: {
+    tarefas: [{ id: "t1", titulo: "Revisar projeto elétrico", projeto: "015-26", prazo: "2026-10-14", atrasada: true },
+      { id: "dt2", titulo: "Ligar para o fornecedor de louças", projeto: "", prazo: "", atrasada: false }],
     precisa: [
       { id: "a1", tipo: "aprovacao", titulo: "Cliente aprovou o layout do térreo", detalhe: "015-26 Deane e Vinicius · há 2 h", badge: "APROVAÇÃO", cor: "v", projeto: "015-26" },
       { id: "a2", tipo: "comentario", titulo: "Responder comentário no portal", detalhe: "021-26 Ventisol · Planta baixa", badge: "COMENTÁRIO", cor: "a", projeto: "021-26" },

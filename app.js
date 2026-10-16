@@ -178,6 +178,8 @@ function telaHoje() {
     ${estado.erroConexao ? `<div class="card pendente"><div class="p" style="margin:0">${esc(estado.erroConexao)} Mostrando os últimos dados.</div></div>` : ""}
     <h2 class="sec">Precisa de você · ${d.hoje.precisa.length}</h2>
     ${d.hoje.precisa.map((i) => `<div class="card toque" data-precisa="${esc(i.id)}"><div class="linha"><div class="t">${esc(i.titulo)}<div class="p">${esc(i.detalhe)}</div></div><span class="pill ${i.cor || "c"} dir">${esc(i.badge)}</span></div></div>`).join("") || '<div class="vazio">Nada pendente agora.</div>'}
+    <h2 class="sec">Tarefas · ${(d.hoje.tarefas || []).length}</h2>
+    ${(d.hoje.tarefas || []).map((t) => `<div class="card"><div class="linha"><button class="check" data-tarefa-hoje="${esc(t.id)}" aria-label="Concluir"></button><div class="t">${esc(t.titulo)}<div class="p">${t.projeto ? esc(t.projeto) : "Sem projeto"}${t.prazo ? ` · <span style="color:${t.atrasada ? "var(--verm)" : "inherit"}">${t.atrasada ? "atrasada · " : ""}${dataBr(t.prazo)}</span>` : ""}</div></div></div></div>`).join("") || '<div class="vazio">Sem tarefas abertas.</div>'}
     <h2 class="sec">Agenda</h2>
     ${Object.keys(dias).sort().map((dia) => { const dt = new Date(dia + "T12:00"); return `<div class="card"><div class="p" style="margin:0 0 4px">${sem[dt.getDay()]} ${dataBr(dia)}${dia === hojeIso ? " · hoje" : ""}</div>${dias[dia].map((e) => `<div class="t">${esc(e.hora)} ${esc(e.titulo)}</div>`).join("")}</div>`; }).join("") || '<div class="vazio">Sem compromissos nesta semana.</div>'}`;
 }
@@ -498,6 +500,16 @@ document.addEventListener("click", async (e) => {
     return;
   }
   if ((el = q("[data-finsub]"))) { estado.finSub = el.dataset.finsub; desenhar(); return; }
+  if ((el = q("[data-tarefa-hoje]"))) {
+    const id = el.dataset.tarefaHoje, lista = d.hoje.tarefas || [], t = lista.find((x) => x.id === id);
+    if (!t) return;
+    if (id.startsWith("novo-")) { avisar("Aguarde: o Dudoo ainda vai gravar essa tarefa."); return; }
+    comando("concluir_tarefa", { tarefa_id: id, feita: true }, () => {
+      lista.splice(lista.indexOf(t), 1);
+      (d.projetos || []).forEach((p) => p.tarefas.forEach((x) => { if (x.id === id) x.feita = true; }));
+    });
+    return;
+  }
   if ((el = q("[data-tarefa]"))) {
     const p = d.projetos.find((x) => x.id === estado.projeto), t = p && p.tarefas.find((x) => x.id === el.dataset.tarefa);
     if (t) comando("concluir_tarefa", { projeto: p.id, tarefa_id: t.id, feita: !t.feita }, () => { t.feita = !t.feita; });
@@ -634,7 +646,11 @@ document.addEventListener("click", async (e) => {
         if (!titulo) { avisar("Escreva a tarefa."); return false; }
         const proj = d.projetos.find((x) => x.codigo === codigo);
         const nova = { id: "novo-" + Date.now(), titulo, feita: false, prazo };
-        comando("criar_tarefa", { titulo, projeto: codigo, prazo, local_id: nova.id }, () => { if (proj) proj.tarefas.unshift(nova); });
+        comando("criar_tarefa", { titulo, projeto: codigo, prazo, local_id: nova.id }, () => {
+          if (proj) proj.tarefas.unshift(nova);
+          d.hoje.tarefas = d.hoje.tarefas || [];
+          d.hoje.tarefas.unshift({ id: nova.id, titulo, projeto: codigo, prazo, atrasada: !!prazo && prazo < hoje });
+        });
         avisar(proj ? `Tarefa criada em ${proj.codigo}. O Dudoo grava assim que estiver aberto.` : "Tarefa criada. O Dudoo grava assim que estiver aberto.");
       });
       setTimeout(() => { const t = $("#t-titulo"); if (t) t.focus(); }, 60);
