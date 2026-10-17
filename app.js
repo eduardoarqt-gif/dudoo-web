@@ -196,7 +196,7 @@ function telaProjetos() {
         <h2 class="sec">Próximo prazo</h2><div class="card"><div class="t" style="color:${p.atrasado ? "var(--verm)" : "inherit"}">${esc(p.prazo)}</div></div>
         <h2 class="sec">Atalhos</h2><button class="btn o peq" data-acao="whatsapp-projeto">WhatsApp do cliente</button><button class="btn o peq" data-aba-ir="portal">Ver no portal</button>`;
     } else if (estado.subProjeto === "tarefas") {
-      corpo = `<h2 class="sec">Tarefas · ${p.tarefas.filter((t) => !t.feita).length} abertas</h2>` +
+      corpo = `<h2 class="sec">Tarefas · ${p.tarefas.filter((t) => !t.feita).length} abertas</h2><button class="btn o atalho" data-acao="nova-tarefa">+ Nova tarefa</button>` +
         (p.tarefas.map((t) => `<div class="card"><div class="linha"><button class="check ${t.feita ? "ok" : ""}" data-tarefa="${esc(t.id)}" aria-label="Concluir"></button><div class="t ${t.feita ? "feita" : ""}">${esc(t.titulo)}</div></div></div>`).join("") || '<div class="vazio">Sem tarefas.</div>');
     } else if (estado.subProjeto === "notas") {
       corpo = blocoNotas(p.codigo);
