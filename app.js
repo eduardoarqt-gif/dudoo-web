@@ -153,7 +153,7 @@ async function liberarFinanceiro() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) estado.liberado = false; });
 
 // ---------------------------------------------------------------- telas
-const ABAS = [["hoje", "Hoje"], ["projetos", "Projetos"], ["ideias", "Ideias"], ["portal", "Portal"], ["financeiro", "Financeiro"], ["mais", "Mais"]];
+const ABAS = [["hoje", "Hoje"], ["projetos", "Projetos"], ["ideias", "Marketing"], ["portal", "Portal"], ["financeiro", "Financeiro"], ["mais", "Mais"]];
 
 function desenharAbas() {
   const n = estado.dados ? estado.dados.hoje.precisa.length : 0;
@@ -391,12 +391,68 @@ function cartaoLeque(i, n) {
       <button class="btn o peq" data-ideia-acao="imagem" data-ideia="${esc(i.id)}">+ Imagem</button>`}</div></div>`;
 }
 
+const ROTULO_TIPO_POST = { feed: "Feed", stories: "Stories", reels: "Reels" };
+const ROTULO_STATUS_POST = { rascunho: "Rascunho", planejado: "Planejado", agendado: "Agendado", processando: "Publicando…", publicado: "Publicado", falha: "Falhou" };
+const COR_STATUS_POST = { publicado: "v", agendado: "a", processando: "a", falha: "r", planejado: "c", rascunho: "c" };
+const postsMarketing = () => (estado.dados && estado.dados.marketing && estado.dados.marketing.posts) || [];
+
+function subMenuMarketing() {
+  const sub = estado.subMkt || "ideias", n = postsMarketing().filter((p) => p.status !== "publicado").length;
+  return `<div class="seg"><button class="${sub === "ideias" ? "on" : ""}" data-sub-mkt="ideias">Ideias</button>
+    <button class="${sub === "posts" ? "on" : ""}" data-sub-mkt="posts">Posts · ${n}</button></div>`;
+}
+
+// Posts planejados (calendário do Marketing): agrupados por dia; toque abre a edição (legenda, dia e hora).
+function telaPosts() {
+  const posts = postsMarketing(), hoje = new Date().toISOString().slice(0, 10);
+  const grupos = posts.reduce((m, p) => { (m[p.data] = m[p.data] || []).push(p); return m; }, {});
+  const dias = Object.keys(grupos).sort();
+  const cartao = (p) => `<div class="card toque" data-post="${esc(p.id)}"><div class="linha">${p.miniatura ? `<img class="mini-banco" src="${p.miniatura}" alt="">` : ""}
+    <div class="t"><b>${esc(p.titulo || (p.legenda || "").split("\n")[0] || "(sem título)")}</b>
+    <div class="p">${esc(ROTULO_TIPO_POST[p.tipo] || p.tipo)} · ${esc(p.hora || "sem hora")}${p.projeto ? " · " + esc(p.projeto) : ""}${p.erro ? ` · <span style="color:var(--verm)">${esc(p.erro)}</span>` : ""}</div></div>
+    <span class="pill ${COR_STATUS_POST[p.status] || "c"} dir">${esc(ROTULO_STATUS_POST[p.status] || p.status)}</span></div></div>`;
+  return `<h1>Marketing</h1>${subMenuMarketing()}
+    <div class="mini" style="margin:8px 0 4px">${posts.filter((p) => p.status !== "publicado").length} post(s) a publicar nos próximos dias · toque num post pra editar</div>
+    ${dias.map((dia) => `<h2 class="sec">${dia === hoje ? "Hoje" : esc(dataBr(dia))} · ${grupos[dia].length}</h2>${grupos[dia].map(cartao).join("")}`).join("") || '<div class="vazio">Nenhum post planejado pros próximos dias.</div>'}`;
+}
+
+function editarPost(id) {
+  const p = postsMarketing().find((x) => x.id === id);
+  if (!p) return;
+  if (!p.editavel) {
+    abrirFolha(p.status === "publicado" ? "Post publicado" : "Post do calendário antigo",
+      `<div class="p" style="margin:8px 0">${esc(ROTULO_TIPO_POST[p.tipo] || p.tipo)} · ${esc(dataBr(p.data))} ${esc(p.hora || "")}</div>
+       <div class="card" style="white-space:pre-wrap">${esc(p.legenda || "(sem legenda)")}</div>
+       <div class="p">${p.status === "publicado" ? "Já foi publicado: não dá mais pra alterar." : "Este post vem do calendário antigo do Feed: dá pra ver aqui, mas só se edita no Dudoo do computador."}</div>`,
+      "Fechar", () => true);
+    return;
+  }
+  const campos = `<div class="p" style="margin:6px 0">${esc(ROTULO_TIPO_POST[p.tipo] || p.tipo)} · ${esc(ROTULO_STATUS_POST[p.status] || p.status)}${p.midias ? ` · ${p.midias} mídia(s)` : ""}</div>
+    <label class="rot">Legenda</label><textarea class="campo" id="po-legenda" style="min-height:140px">${esc(p.legenda || "")}</textarea>
+    <label class="rot">Dia</label><input class="campo" id="po-data" type="date" value="${esc(p.data || "")}">
+    <label class="rot">Hora (opcional)</label><input class="campo" id="po-hora" type="time" value="${esc(p.hora || "")}">
+    <button class="btn o" id="po-tirar" style="margin-top:12px">Tirar do calendário</button>`;
+  abrirFolha("Editar post", campos, "Salvar", () => {
+    const legenda = $("#po-legenda").value, data = $("#po-data").value || "", hora = $("#po-hora").value || "";
+    if (!data) { avisar("Escolha o dia do post."); return false; }
+    comando("editar_post", { id: p.id, legenda, data, hora }, () => { p.legenda = legenda; p.data = data; p.hora = hora; });
+    avisar("Alteração enviada. O Dudoo do computador aplica assim que estiver aberto.");
+  });
+  const tirar = document.getElementById("po-tirar");
+  if (tirar) tirar.addEventListener("click", () => {
+    comando("desprogramar_post", { id: p.id }, () => { const lista = postsMarketing(), i = lista.indexOf(p); if (i >= 0) lista.splice(i, 1); });
+    fecharFolha();
+    avisar("Post tirado do calendário (vira rascunho no Dudoo do computador).");
+  });
+}
+
 function telaIdeias() {
+  if ((estado.subMkt || "ideias") === "posts") return telaPosts();
   const c = conteudo(), ct = c.contadores || {}, lista = listaDoLeque();
   const todas = c.ideias.filter((i) => i.situacao !== "arquivada");
   const captura = Object.keys(NOMES_FORMATO).map((k) =>
     `<button class="chip${estado.captura.formatos.includes(k) ? " on" : ""}" data-cap-formato="${k}">${NOMES_FORMATO[k]}</button>`).join("");
-  return `<h1>Ideias</h1><div class="mini">${ct.ideias || 0} ideias · ${ct.planejados || 0} planejadas · ${ct.em_producao || 0} em produção · ${ct.publicados || 0} publicadas</div>
+  return `<h1>Marketing</h1>${subMenuMarketing()}<div class="mini">${ct.ideias || 0} ideias · ${ct.planejados || 0} planejadas · ${ct.em_producao || 0} em produção · ${ct.publicados || 0} publicadas</div>
     <div class="card" style="margin-top:12px"><textarea class="campo" id="ideia-texto" style="margin-top:0;min-height:74px" placeholder="Acabou de ter uma ideia? Escreva ou dite aqui…">${esc(estado.captura.texto)}</textarea>
       <div class="cap-barra">
         <button class="cap-ic" data-acao="cap-mic" aria-label="Ditar"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0M12 17v4"/></svg></button>
@@ -561,6 +617,8 @@ document.addEventListener("click", async (e) => {
     else if (item && item.tipo === "pagar") { estado.aba = "financeiro"; estado.finSub = "pagar"; desenhar(); if (!estado.liberado) liberarFinanceiro(); }
     return;
   }
+  if ((el = q("[data-sub-mkt]"))) { estado.subMkt = el.dataset.subMkt; desenhar(); return; }
+  if ((el = q("[data-post]"))) { editarPost(el.dataset.post); return; }
   if ((el = q("[data-escopo]"))) { estado.leque.escopo = el.dataset.escopo; estado.leque.indice = 0; desenhar(); return; }
   if ((el = q("[data-cap-formato]"))) {
     const t = $("#ideia-texto"); if (t) estado.captura.texto = t.value;

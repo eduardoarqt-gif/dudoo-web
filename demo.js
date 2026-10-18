@@ -23,6 +23,12 @@ window.DUDOO_DEMO = {
     { id: "n1", titulo: "015-26 Deane E Vinicius", texto: "015-26 Deane E Vinicius" + String.fromCharCode(10) + "Cliente quer trocar o piso da varanda por porcelanato 120x120. Ver prazo com o fornecedor.", projeto: "015-26", atualizado: new Date().toISOString() },
     { id: "n2", titulo: "Ideias para a vitrine da semana", texto: "Ideias para a vitrine da semana" + String.fromCharCode(10) + "Mostrar antes e depois da cozinha do Elliott.", projeto: "", atualizado: new Date(Date.now() - 86400000).toISOString() }
   ],
+  marketing: { posts: [
+    { id: "p1", tipo: "feed", titulo: "Cozinha integrada: antes e depois", data: new Date(Date.now() + 86400000).toISOString().slice(0, 10), hora: "11:00",
+      legenda: "Antes e depois da cozinha integrada. O que você mudaria?", status: "agendado", projeto: "", midias: 3, erro: "", editavel: true, link: "" },
+    { id: "p2", tipo: "stories", titulo: "Bastidores da obra", data: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10), hora: "09:30",
+      legenda: "", status: "planejado", projeto: "", midias: 1, erro: "", editavel: true, link: "" },
+  ] },
   conteudo: {
     concluidos: 0, total: 3, contadores: { ideias: 4, planejados: 2, em_producao: 1, publicados: 0 },
     series: ["Fato ou Mito", "Antes e depois", "Dicas"],
