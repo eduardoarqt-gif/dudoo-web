@@ -205,7 +205,7 @@ function telaProjetos() {
     } else if (estado.subProjeto === "notas") {
       corpo = blocoNotas(p.codigo);
     } else {
-      corpo = `<h2 class="sec">Avisar o cliente</h2><div class="card"><textarea class="campo" id="aviso-texto" placeholder="Escreva o aviso para o portal…"></textarea><button class="btn" data-acao="publicar-aviso" data-projeto="${esc(p.id)}">Publicar no portal</button></div>`;
+      corpo = blocoEntregas(p) + `<h2 class="sec">Avisar o cliente</h2><div class="card"><textarea class="campo" id="aviso-texto" placeholder="Escreva o aviso para o portal…"></textarea><button class="btn" data-acao="publicar-aviso" data-projeto="${esc(p.id)}">Publicar no portal</button></div>`;
     }
     return `<button class="voltar" data-acao="voltar">‹ Projetos</button><h1>${esc(p.codigo)} ${esc(p.nome)}</h1><div class="mini">${esc(p.sub)}</div>
       <div class="seg">${abas.map(([k, n]) => `<button data-subprojeto="${k}" class="${estado.subProjeto === k ? "on" : ""}">${n}</button>`).join("")}</div>${corpo}`;
@@ -568,6 +568,19 @@ function acaoIdeia(id, acao) {
 const projetoAtual = () => ((estado.dados && estado.dados.projetos) || []).find((x) => x.id === estado.projeto);
 const hojeISO = () => new Date().toISOString().slice(0, 10);
 const brCompleta = (iso) => { const [a, m, d] = String(iso || "").slice(0, 10).split("-"); return d ? `${d}/${m}/${a}` : "—"; };
+
+function blocoEntregas(p) {
+  const lista = p.entregas || [];
+  if (!lista.length) return `<h2 class="sec">Entregas publicadas</h2><div class="vazio">Nenhuma entrega publicada no portal (ou o Dudoo aberto no computador ainda não é a versão que envia a lista).</div>`;
+  const dias = (iso) => Math.max(0, Math.round((Date.now() - Date.parse(iso + "T12:00")) / 86400000));
+  const rotulo = { cliente: "cliente", tecnico: "engenheiro/fornecedor" };
+  const situacao = (e) => e.st === "aprovado" ? '<span class="pill v">Aprovado</span>' : e.st === "revisao_pedida" ? '<span class="pill a">Revisão pedida</span>'
+    : e.requer && e.publico.includes("cliente") ? `<span class="pill a">Aguardando${e.em ? ` há ${dias(e.em)} d` : ""}</span>` : '<span class="pill">Só consulta</span>';
+  const linha = (e) => { const miolo = `<div class="linha"><div class="t"><b>${esc(e.nome)}</b><div class="p">${[e.cat, e.em ? brCompleta(e.em) : "", e.publico.map((x) => rotulo[x] || x).join(" + ")].filter(Boolean).map(esc).join(" · ")}</div>
+      ${e.st === "revisao_pedida" && e.obs ? `<div class="p" style="margin-top:4px">“${esc(e.obs)}”</div>` : ""}</div>${situacao(e)}</div>`;
+    return e.link ? `<a class="card toque" style="display:block;color:inherit;text-decoration:none" href="${esc(e.link)}" target="_blank" rel="noopener">${miolo}</a>` : `<div class="card">${miolo}</div>`; };
+  return `<h2 class="sec">Entregas publicadas · ${lista.length}</h2>${lista.map(linha).join("")}<div class="mini">Toque para abrir no Dropbox. Aprovar e publicar continua no Dudoo.</div>`;
+}
 
 function corpoCronograma(p) {
   if (!p.cronograma) return '<div class="vazio">Sem cronograma por aqui: o projeto ainda não tem um no Dudoo, ou o Dudoo aberto no computador é de uma versão que ainda não envia o cronograma.</div>';
