@@ -139,3 +139,5 @@ html,body,*{touch-action:manipulation}
 .obra-cat summary::-webkit-details-marker{display:none}.obra-cat summary .p{flex-basis:100%}
 .obra-item{border-top:1px solid var(--borda);padding-top:10px;margin-top:10px;cursor:pointer}
 .nota-previa{font-size:13px;color:var(--texto2);margin-top:6px;white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.mini-caixa{position:relative}.mini-caixa .mini-ideia{margin:6px 0;max-height:150px}.mini-video{position:absolute;left:8px;bottom:14px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 8px;border-radius:99px}
+.fotos-post{display:flex;gap:8px;overflow-x:auto;margin:8px 0;-webkit-overflow-scrolling:touch}.foto-post{position:relative;flex:0 0 auto}.foto-post img{height:150px;width:auto;border-radius:10px;display:block}.foto-post .mini-video{left:6px;bottom:6px}

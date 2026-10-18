@@ -242,10 +242,9 @@ function cartaoNota(n) {
 }
 function blocoNotas(codigo) {
   const d = estado.dados, lista = todasNotas().filter((n) => (codigo === undefined ? true : codigo === "" ? !n.projeto : n.projeto === codigo));
-  const opcoes = `<option value="">Sem projeto</option>` + d.projetos.map((p) => `<option value="${esc(p.codigo)}" ${p.codigo === codigo ? "selected" : ""}>${esc(p.codigo)} ${esc(p.nome)}</option>`).join("");
-  return `<div class="card"><select class="campo" id="nota-projeto" style="margin-top:0">${opcoes}</select>
-      <textarea class="campo" id="nota-texto" placeholder="Escreva a nota…"></textarea><button class="btn" data-acao="salvar-nota">Salvar nota</button></div>
-    <h2 class="sec">${lista.length} nota(s)</h2>${lista.map(cartaoNota).join("") || '<div class="vazio">Nenhuma nota.</div>'}`;
+  // 17/10/2026: sem o cartão fixo de "Salvar nota" (criava nota repetida sem querer); a nota existente abre pra EDITAR ao tocar,
+  // e a nova abre numa folha pelo botão.
+  return `<div class="linha" style="margin-top:6px"><h2 class="sec" style="flex:1;margin:14px 0 8px">${lista.length} nota(s)</h2><button class="btn o peq" data-acao="nova-nota" data-cod-nota="${esc(codigo || "")}">+ Nova nota</button></div>${lista.map(cartaoNota).join("") || '<div class="vazio">Nenhuma nota.</div>'}`;
 }
 function abrirNota(id) {
   const n = todasNotas().find((x) => x.id === id);
@@ -406,8 +405,9 @@ function cartaoLeque(i, n) {
     `<button class="chip${(i.formatos || []).includes(k) ? " on" : ""}" data-formato="${k}" data-ideia="${esc(i.id)}">${NOMES_FORMATO[k]}</button>`).join("");
   return `<div class="carta${feita ? " feita-c" : ""}" data-n="${n}">
     <div><span class="pill c">${esc(i.serie || "Sem série")}</span>${i.prioridade === "alta" ? ' <span class="pill a">alta</span>' : ""}</div>
+    ${i.aviso ? `<div><span class="pill v">${esc(i.aviso)}</span></div>` : ""}
     <h3>${esc(i.titulo)}</h3>
-    ${i.miniatura ? `<img class="mini-ideia" src="${i.miniatura}" alt="">` : ""}
+    ${i.miniatura ? `<div class="mini-caixa"><img class="mini-ideia" src="${i.miniatura}" alt="">${i.video ? '<span class="mini-video">▶ vídeo</span>' : ""}${(i.imagens || 0) > 1 ? `<span class="mini-video">${i.imagens} imagens</span>` : ""}</div>` : ""}
     <div class="chips">${chips}</div>
     <div class="carta-acoes">${feita ? '<span class="pill v">concluída</span>' : `
       <button class="btn peq" data-ideia-acao="aceitar" data-ideia="${esc(i.id)}">${aceita ? "Aceita ✓" : "Aceitar"}</button>
@@ -442,19 +442,26 @@ function telaPosts() {
     ${dias.map((dia) => `<h2 class="sec">${dia === hoje ? "Hoje" : esc(dataBr(dia))} · ${grupos[dia].length}</h2>${grupos[dia].map(cartao).join("")}`).join("") || '<div class="vazio">Nenhum post planejado pros próximos dias.</div>'}`;
 }
 
+function fotosDoPost(p) {
+  const fotos = p.fotos && p.fotos.length ? p.fotos : (p.miniatura ? [{ u: p.miniatura, v: false }] : []);
+  if (!fotos.length) return p.midias ? `<div class="mini" style="margin:6px 0">${p.midias} mídia(s) neste post (a prévia só aparece quando o arquivo está no computador).</div>` : "";
+  return `<div class="fotos-post">${fotos.map((f) => `<div class="foto-post"><img src="${f.u}" alt="">${f.v ? '<span class="mini-video">▶</span>' : ""}</div>`).join("")}</div>`
+    + (p.midias > fotos.length ? `<div class="mini">Mostrando ${fotos.length} de ${p.midias}.</div>` : "");
+}
+
 function editarPost(id) {
   const p = postsMarketing().find((x) => x.id === id);
   if (!p) return;
   if (!p.editavel) {
     abrirFolha(p.status === "publicado" ? "Post publicado" : "Post do calendário antigo",
       `<div class="p" style="margin:8px 0">${esc(ROTULO_TIPO_POST[p.tipo] || p.tipo)} · ${esc(dataBr(p.data))} ${esc(p.hora || "")}</div>
-       <div class="card" style="white-space:pre-wrap">${esc(p.legenda || "(sem legenda)")}</div>
+       ${fotosDoPost(p)}<div class="card" style="white-space:pre-wrap">${esc(p.legenda || "(sem legenda)")}</div>
        <div class="p">${p.status === "publicado" ? "Já foi publicado: não dá mais pra alterar." : "Este post vem do calendário antigo do Feed: dá pra ver aqui, mas só se edita no Dudoo do computador."}</div>`,
       "Fechar", () => true);
     return;
   }
   const campos = `<div class="p" style="margin:6px 0">${esc(ROTULO_TIPO_POST[p.tipo] || p.tipo)} · ${esc(ROTULO_STATUS_POST[p.status] || p.status)}${p.midias ? ` · ${p.midias} mídia(s)` : ""}</div>
-    <label class="rot">Legenda</label><textarea class="campo" id="po-legenda" style="min-height:140px">${esc(p.legenda || "")}</textarea>
+    ${fotosDoPost(p)}<label class="rot">Legenda</label><textarea class="campo" id="po-legenda" style="min-height:140px">${esc(p.legenda || "")}</textarea>
     <label class="rot">Dia</label><input class="campo" id="po-data" type="date" value="${esc(p.data || "")}">
     <label class="rot">Hora (opcional)</label><input class="campo" id="po-hora" type="time" value="${esc(p.hora || "")}">
     <button class="btn o" id="po-tirar" style="margin-top:12px">Tirar do calendário</button>`;
@@ -796,14 +803,18 @@ document.addEventListener("click", async (e) => {
     if (a === "atualizar") { await carregar(true); await enviarFila(); desenhar(); avisar(estado.demo ? "Modo demonstração." : "Atualizado."); }
     else if (a === "voltar") { estado.projeto = null; desenhar(); }
     else if (a === "voltar-hoje") { estado.aba = "hoje"; desenhar(); }
-    else if (a === "salvar-nota") {
-      const texto = (($("#nota-texto") || {}).value || "").trim(), codigo = ($("#nota-projeto") || {}).value || "";
-      if (!texto) { avisar("Escreva a nota antes de salvar."); return; }
-      const proj = d.projetos.find((x) => x.codigo === codigo);
-      const completo = proj ? `${proj.codigo} ${proj.nome}\n${texto}` : texto;
-      const nova = { id: "novo-" + Date.now(), titulo: completo.split("\n")[0].slice(0, 80), texto: completo, projeto: codigo, atualizado: new Date().toISOString(), pendente: true };
-      comando("criar_nota", { texto, projeto: codigo, local_id: nova.id }, () => { d.notas.unshift(nova); });
-      avisar("Nota guardada. Vai pro Simplenote quando o Dudoo estiver aberto.");
+    else if (a === "nova-nota") {
+      const fixo = el.dataset.codNota || "";
+      const opcoes = `<option value="">Sem projeto</option>` + d.projetos.map((p) => `<option value="${esc(p.codigo)}" ${p.codigo === fixo ? "selected" : ""}>${esc(p.codigo)} ${esc(p.nome)}</option>`).join("");
+      abrirFolha("Nova nota", `<select class="campo" id="nota-projeto" style="margin-top:0">${opcoes}</select><textarea class="campo" id="nota-texto" placeholder="Escreva a nota…" style="min-height:200px"></textarea>`, "Salvar nota", () => {
+        const texto = ($("#nota-texto").value || "").trim(), codigo = $("#nota-projeto").value || "";
+        if (!texto) { avisar("Escreva a nota antes de salvar."); return false; }
+        const proj = d.projetos.find((x) => x.codigo === codigo);
+        const completo = proj ? `${proj.codigo} ${proj.nome}\n${texto}` : texto;
+        const nova = { id: "novo-" + Date.now(), titulo: completo.split("\n")[0].slice(0, 80), texto: completo, projeto: codigo, atualizado: new Date().toISOString(), pendente: true };
+        comando("criar_nota", { texto, projeto: codigo, local_id: nova.id }, () => { d.notas.unshift(nova); });
+        avisar("Nota guardada. Vai pro Simplenote quando o Dudoo estiver aberto.");
+      });
     }
     else if (a === "cap-mic") {
       const t = $("#ideia-texto"); if (t) t.focus();
