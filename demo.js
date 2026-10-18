@@ -3,6 +3,12 @@ window.DUDOO_DEMO = {
   atualizado_em: new Date().toISOString(),
   usuario: { nome: "Eduardo", ponto: "fora" },
   hoje: {
+    dia: [{ id: "d1", titulo: "Revisar projeto elétrico", feita: false, origem: "Executivo Sol Nascente", atraso: 1, urgente: false, prazo: "" },
+      { id: "d2", titulo: "Ligar para o fornecedor de louças", feita: false, origem: "", atraso: 0, urgente: false, prazo: "" },
+      { id: "d3", titulo: "Enviar contrato", feita: true, origem: "101-26", atraso: 0, urgente: false, prazo: "" }],
+    puxar: [{ id: "p1", titulo: "Fechar planta baixa", grupo: "Metas da semana", rotulo: "Executivo Sol Nascente", prazo: "" },
+      { id: "p2", titulo: "Comprar trena", grupo: "Fila", rotulo: "", prazo: "" },
+      { id: "p3", titulo: "Pedir orçamento de gesso", grupo: "Projetos", rotulo: "102-26 Sol Nascente", prazo: "2026-10-22" }],
     tarefas: [{ id: "t1", titulo: "Revisar projeto elétrico", projeto: "101-26", prazo: "2026-10-14", atrasada: true },
       { id: "dt2", titulo: "Ligar para o fornecedor de louças", projeto: "", prazo: "", atrasada: false }],
     precisa: [

@@ -181,6 +181,24 @@ function desenharAbas() {
     `<button data-aba="${k}" class="${estado.aba === k ? "on" : ""}"><i></i>${nome}${k === "hoje" && n ? `<span class="n">${n}</span>` : ""}</button>`).join("");
 }
 
+// Lista do dia (18/10/2026): a mesma do painel Hoje do Dudoo do PC — anota direto, puxa de metas/fila/tarefas/projetos, vai checando.
+// O que não foi feito hoje aparece amanhã ("há 1 dia"). Marcar aqui dá baixa na lista de origem.
+function listaDoDia() {
+  const dia = estado.dados.hoje.dia || [];
+  const feitas = dia.filter((t) => t.feita).length;
+  const linhas = dia.map((t) => {
+    const etiqueta = [t.urgente ? "URGENTE" : "", t.origem || "", t.atraso > 0 && !t.feita ? `há ${t.atraso} dia${t.atraso > 1 ? "s" : ""}` : ""].filter(Boolean).join(" · ");
+    const vermelho = !t.feita && (t.atraso > 0 || t.urgente);
+    return `<div class="card"><div class="linha"><button class="check ${t.feita ? "ok" : ""}" data-dia-check="${esc(t.id)}" aria-label="Marcar"></button>
+      <div class="t ${t.feita ? "feita" : ""}">${esc(t.titulo)}${etiqueta ? `<div class="p" style="color:${vermelho ? "var(--verm)" : "inherit"}">${esc(etiqueta)}</div>` : ""}</div>
+      ${t.feita ? "" : `<button class="atualizar" data-dia-tirar="${esc(t.id)}" aria-label="Tirar do dia">Tirar</button>`}</div></div>`;
+  }).join("");
+  return `<h2 class="sec">Hoje · ${dia.length ? `${feitas}/${dia.length} feitas` : "lista do dia"}</h2>
+    <form class="perg" data-form="dia-anotar"><input id="dia-novo" placeholder="Anotar no dia…" autocomplete="off"><button>+</button></form>
+    <button class="btn o atalho" data-acao="dia-puxar">Puxar de… metas, fila, tarefas, projetos</button>
+    ${linhas || '<div class="vazio">Nada na lista de hoje. Anote acima ou puxe de outras listas.</div>'}`;
+}
+
 function telaHoje() {
   const d = estado.dados, hoje = new Date();
   const dias = d.hoje.agenda.reduce((m, e) => { (m[e.dia] = m[e.dia] || []).push(e); return m; }, {});
@@ -197,6 +215,7 @@ function telaHoje() {
     <button class="btn o atalho" data-acao="cadastro-lead">Cadastro de leads</button>
     ${estado.demo ? '<div class="card toque" data-aba-ir="mais"><div class="t"><b>Conectar ao Dudoo</b><div class="p">Você está vendo dados de exemplo. Toque para colar o link de conexão.</div></div></div>' : ""}
     ${estado.erroConexao ? `<div class="card pendente"><div class="p" style="margin:0">${esc(estado.erroConexao)} Mostrando os últimos dados.</div></div>` : ""}
+    ${listaDoDia()}
     <h2 class="sec">Precisa de você · ${d.hoje.precisa.length}</h2>
     ${d.hoje.precisa.map((i) => `<div class="card toque" data-precisa="${esc(i.id)}"><div class="linha"><div class="t">${esc(i.titulo)}<div class="p">${esc(i.detalhe)}</div></div><span class="pill ${i.cor || "c"} dir">${esc(i.badge)}</span></div></div>`).join("") || '<div class="vazio">Nada pendente agora.</div>'}
     <h2 class="sec">Tarefas · ${(d.hoje.tarefas || []).length}</h2>
@@ -785,6 +804,19 @@ document.addEventListener("click", async (e) => {
     return;
   }
   if ((el = q("[data-finsub]"))) { estado.finSub = el.dataset.finsub; desenhar(); return; }
+  if ((el = q("[data-dia-check]"))) {
+    const id = el.dataset.diaCheck, lista = d.hoje.dia || [], t = lista.find((x) => x.id === id);
+    if (!t) return;
+    if (id.startsWith("novo-")) { avisar("Aguarde: o Dudoo ainda vai gravar essa tarefa."); return; }
+    comando("concluir_no_dia", { tarefa_id: id, feita: !t.feita }, () => { t.feita = !t.feita; });
+    return;
+  }
+  if ((el = q("[data-dia-tirar]"))) {
+    const id = el.dataset.diaTirar, lista = d.hoje.dia || [], t = lista.find((x) => x.id === id);
+    if (!t || id.startsWith("novo-")) return;
+    comando("tirar_do_dia", { tarefa_id: id }, () => { lista.splice(lista.indexOf(t), 1); });
+    return;
+  }
   if ((el = q("[data-tarefa-hoje]"))) {
     const id = el.dataset.tarefaHoje, lista = d.hoje.tarefas || [], t = lista.find((x) => x.id === id);
     if (!t) return;
@@ -939,6 +971,25 @@ document.addEventListener("click", async (e) => {
       const q = novoRascunho(); abrirQuadro(q.local_id);
     } else if (a === "quadro-planta") {
       escolherPlanta();
+    } else if (a === "dia-puxar") {
+      const cands = d.hoje.puxar || [];
+      if (!cands.length) { avisar("Nada pra puxar: tudo já está na lista de hoje."); return; }
+      const grupos = ["Metas da semana", "Fila", "Tarefas", "Projetos"];
+      const corpo = grupos.map((g) => {
+        const itens = cands.filter((c) => c.grupo === g);
+        return itens.length ? `<div class="p" style="margin:10px 0 2px"><b>${esc(g)}</b> · ${itens.length}</div>` + itens.map((c) =>
+          `<label class="linha" style="gap:10px;padding:6px 0"><input type="checkbox" data-puxar="${esc(c.id)}"><span class="t">${esc(c.titulo)}<span class="p" style="display:block">${esc([c.rotulo, c.prazo ? "até " + dataBr(c.prazo) : ""].filter(Boolean).join(" · "))}</span></span></label>`).join("") : "";
+      }).join("");
+      abrirFolha("Puxar pra hoje", `<div style="max-height:55vh;overflow:auto">${corpo}</div>`, "Puxar pra hoje", () => {
+        const ids = Array.from(document.querySelectorAll("#folha [data-puxar]:checked")).map((x) => x.dataset.puxar);
+        if (!ids.length) { avisar("Marque ao menos um item."); return false; }
+        comando("puxar_para_dia", { ids }, () => {
+          d.hoje.dia = d.hoje.dia || [];
+          cands.filter((c) => ids.includes(c.id)).forEach((c) => d.hoje.dia.push({ id: c.id, titulo: c.titulo, feita: false, origem: c.rotulo || c.grupo, atraso: 0, urgente: false, prazo: c.prazo }));
+          d.hoje.puxar = cands.filter((c) => !ids.includes(c.id));
+        });
+        avisar(`${ids.length} item(ns) na lista de hoje. O Dudoo grava assim que estiver aberto.`);
+      });
     } else if (a === "nova-tarefa") {
       const hoje = new Date().toISOString().slice(0, 10);
       const projetos = (d.projetos || []).filter((p) => p.estado === "ativo")
@@ -1012,6 +1063,14 @@ document.addEventListener("change", async (e) => {
   }
 });
 document.addEventListener("submit", (e) => {
+  const anotar = e.target.closest("[data-form='dia-anotar']");
+  if (anotar) {
+    e.preventDefault();
+    const campo = $("#dia-novo"), titulo = (campo.value || "").trim(); if (!titulo) return;
+    const d = estado.dados, nova = { id: "novo-" + Date.now(), titulo, feita: false, origem: "", atraso: 0, urgente: false, prazo: "" };
+    comando("anotar_no_dia", { titulo, local_id: nova.id }, () => { d.hoje.dia = d.hoje.dia || []; d.hoje.dia.push(nova); });
+    return;
+  }
   const f = e.target.closest("[data-form='pergunta']"); if (!f) return;
   e.preventDefault();
   const texto = $("#pergunta").value.trim(); if (!texto) return;
@@ -1051,7 +1110,7 @@ function garantirQuadroJs() {
 }
 
 (async function iniciar() {
-  garantirQuadroJs();
+  window.addEventListener("load", garantirQuadroJs);            // depois de todos os <script>: se o index.html já traz o quadro.js, não carrega duas vezes
   lerLinkDeConexao();
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* sem suporte: segue */ }
   estado.dados = ler(CHAVE_DADOS, null);
