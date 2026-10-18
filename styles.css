@@ -129,3 +129,6 @@ input,textarea,select{font-size:16px}
 .cap-foto button{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:99px;border:0;background:var(--texto);color:var(--branco);font-size:15px;line-height:1}
 .mini-ideia{width:100%;max-height:120px;object-fit:cover;border-radius:12px;margin:6px 0}
 .mini-banco{width:44px;height:44px;object-fit:cover;border-radius:10px;margin-right:10px;flex:none}
+
+/* Sem zoom por duplo toque (17/10/2026) */
+html,body,*{touch-action:manipulation}

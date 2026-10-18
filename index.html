@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, minimum-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -15,6 +15,18 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap">
 <link rel="stylesheet" href="styles.css">
 <title>Dudoo Web</title>
+<script>
+/* Sem zoom por duplo toque (17/10/2026): o iOS ignora user-scalable, então segura o 2º toque em áreas que não são botão/campo. */
+(function () {
+  var ultimo = 0;
+  document.addEventListener("touchend", function (e) {
+    var t = Date.now();
+    if (t - ultimo < 350 && !(e.target.closest && e.target.closest("button,a,input,textarea,select,label,summary,[data-acao],[role=button]"))) e.preventDefault();
+    ultimo = t;
+  }, { passive: false });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+})();
+</script>
 </head>
 <body>
 <div id="app" aria-live="polite"></div>
