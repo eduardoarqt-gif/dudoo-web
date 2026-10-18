@@ -294,6 +294,25 @@ const CHAVE_LEAD_AGUARDA = "dudoo_web_lead_aguarda";
 const leadsLista = () => (estado.dados && estado.dados.leads) || [];
 const leadsDevidos = () => leadsLista().filter((l) => l.devido).length;
 const rotuloStatus = (s) => String(s || "").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+// Ao cadastrar um lead pelo app: oferece já abrir o WhatsApp com a 1ª mensagem padrão (18/10/2026, Eduardo). A frase vem do Dudoo (`leads_modelo_primeira`,
+// com {nome} e {tipo}); sem ela, a mesma frase embutida. O nome e o telefone saem do próprio texto colado.
+const MODELO_PRIMEIRA = "Oi {nome}! Aqui é o Eduardo Schmidt, arquiteto. Vi que você solicitou contato pelo nosso anúncio sobre projeto de {tipo}. Você já tem o imóvel?";
+function lerLeadDoTexto(texto) {
+  const pega = (re) => { const m = String(texto || "").match(re); return m ? m[1].trim() : ""; };
+  return { nome: pega(/nome\s*:\s*(.+)/i), telefone: pega(/telefone\s*:\s*(.+)/i), tipo: pega(/tipo\s+d[oa]\s+im[oó]vel\s*:\s*(.+)/i) };
+}
+function primeiraMensagem(lead) {
+  const modelo = (estado.dados && estado.dados.leads_modelo_primeira) || MODELO_PRIMEIRA;
+  return modelo.replace("{nome}", String(lead.nome || "").split(" ")[0]).replace("{tipo}", String(lead.tipo || "").toLowerCase() || "arquitetura");
+}
+function oferecerPrimeiraMensagem(texto) {
+  const lead = lerLeadDoTexto(texto);
+  if (!lead.telefone || !lead.nome) return;
+  abrirFolha("Mandar a 1ª mensagem agora?", `<div class="mini" style="margin-bottom:8px">Lead enviado ao Dudoo. Quer já abrir o WhatsApp de ${esc(lead.nome)} com a mensagem padrão? (Edite se precisar.)</div><textarea class="campo" id="lead-msg" style="min-height:150px">${esc(primeiraMensagem(lead))}</textarea>`, "Abrir WhatsApp", () => {
+    const msg = ($("#lead-msg").value || "").trim();
+    window.open(linkWhatsapp(lead.telefone, msg), "_blank");
+  });
+}
 function linkWhatsapp(tel, texto) {
   let n = String(tel || "").replace(/\D/g, "");
   if (n.length === 10 || n.length === 11) n = "55" + n;
@@ -891,6 +910,7 @@ document.addEventListener("click", async (e) => {
         if (!/nome\s*:/i.test(texto)) { avisar('Não achei a linha "Nome:" no texto.'); return false; }
         comando("cadastrar_lead", { texto });
         avisar("Lead enviado. O Dudoo cadastra quando estiver aberto.");
+        setTimeout(() => oferecerPrimeiraMensagem(texto), 250);        // a folha atual fecha ao confirmar; a oferta abre logo depois
       });
     } else if (a === "nova-tarefa") {
       const hoje = new Date().toISOString().slice(0, 10);
