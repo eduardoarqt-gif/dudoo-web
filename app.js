@@ -12,7 +12,7 @@ const brl = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", c
 const dataBr = (iso) => { const [a, m, d] = String(iso || "").split("-"); return d ? `${d}/${m}` : ""; };
 
 const estado = {
-  aba: "hoje", projeto: null, subProjeto: "resumo", subPortal: "atividade", fin: "escritorio", finSub: "receber",
+  aba: "hoje", projeto: null, subProjeto: "resumo", subPortal: "entregas", fin: "escritorio", finSub: "receber",
   filtroNotas: "__todas", dados: null, demo: true, fila: ler(CHAVE_FILA, []), liberado: false, liberadoEm: 0, ultimaAtualizacao: "", mes: "", erroConexao: "",
 };
 
@@ -153,7 +153,7 @@ async function liberarFinanceiro() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) estado.liberado = false; });
 
 // ---------------------------------------------------------------- telas
-const ABAS = [["hoje", "Hoje"], ["projetos", "Projetos"], ["ideias", "Marketing"], ["portal", "Portal"], ["financeiro", "Financeiro"], ["mais", "Mais"]];
+const ABAS = [["hoje", "Hoje"], ["projetos", "Projetos"], ["ideias", "Marketing"], ["financeiro", "Financeiro"], ["mais", "Mais"]];
 
 function desenharAbas() {
   const n = estado.dados ? estado.dados.hoje.precisa.length : 0;
@@ -194,7 +194,7 @@ function telaProjetos() {
     if (estado.subProjeto === "resumo") {
       corpo = `<h2 class="sec">Andamento</h2><div class="card">${p.frentes.map((f) => `<div class="linha" style="margin-bottom:10px"><div class="t">${esc(f.nome)}<div class="barra"><i style="width:${f.pct}%"></i></div></div><span class="val dir">${f.pct}%</span></div>`).join("")}</div>
         <h2 class="sec">Próximo prazo</h2><div class="card"><div class="t" style="color:${p.atrasado ? "var(--verm)" : "inherit"}">${esc(p.prazo)}</div></div>
-        <h2 class="sec">Atalhos</h2><button class="btn o peq" data-acao="whatsapp-projeto">WhatsApp do cliente</button><button class="btn o peq" data-aba-ir="portal">Ver no portal</button>`;
+        <h2 class="sec">Atalhos</h2><button class="btn o peq" data-acao="whatsapp-projeto">WhatsApp do cliente</button><button class="btn o peq" data-subprojeto="portal">Ver no portal</button>`;
     } else if (estado.subProjeto === "tarefas") {
       corpo = `<h2 class="sec">Tarefas · ${p.tarefas.filter((t) => !t.feita).length} abertas</h2><button class="btn o atalho" data-acao="nova-tarefa">+ Nova tarefa</button>` +
         (p.tarefas.map((t) => `<div class="card"><div class="linha"><button class="check ${t.feita ? "ok" : ""}" data-tarefa="${esc(t.id)}" aria-label="Concluir"></button><div class="t ${t.feita ? "feita" : ""}">${esc(t.titulo)}</div></div></div>`).join("") || '<div class="vazio">Sem tarefas.</div>');
@@ -205,7 +205,7 @@ function telaProjetos() {
     } else if (estado.subProjeto === "notas") {
       corpo = blocoNotas(p.codigo);
     } else {
-      corpo = blocoEntregas(p) + `<h2 class="sec">Avisar o cliente</h2><div class="card"><textarea class="campo" id="aviso-texto" placeholder="Escreva o aviso para o portal…"></textarea><button class="btn" data-acao="publicar-aviso" data-projeto="${esc(p.id)}">Publicar no portal</button></div>`;
+      corpo = corpoPortal(p);
     }
     return `<button class="voltar" data-acao="voltar">‹ Projetos</button><h1>${esc(p.codigo)} ${esc(p.nome)}</h1><div class="mini">${esc(p.sub)}</div>
       <div class="seg">${abas.map(([k, n]) => `<button data-subprojeto="${k}" class="${estado.subProjeto === k ? "on" : ""}">${n}</button>`).join("")}</div>${corpo}`;
@@ -303,18 +303,21 @@ function perguntarEnviei() {
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden && ler(CHAVE_LEAD_AGUARDA, null)) perguntarEnviei(); });
 
-function telaPortal() {
-  const d = estado.dados.portal, abas = [["atividade", "Atividade"], ["acessos", "Acessos"], ["aviso", "Avisos"]];
+// Portal do cliente DENTRO do projeto (17/10/2026: saiu do menu de baixo): Entregas, Atividade, Acessos e Avisos só deste projeto.
+function corpoPortal(p) {
+  const d = estado.dados.portal || { acessos: [], atividade: [] }, abas = [["entregas", "Entregas"], ["atividade", "Atividade"], ["acessos", "Acessos"], ["aviso", "Avisos"]];
+  const sub = abas.some(([k]) => k === estado.subPortal) ? estado.subPortal : "entregas";
   let corpo;
-  if (estado.subPortal === "acessos") {
-    corpo = d.acessos.map((a) => `<div class="card"><div class="linha"><div class="t"><b>${esc(a.cliente)}</b><div class="p">${esc(a.projeto)} · ${esc(a.quando)}${a.total ? ` · ${a.total} acessos` : ""}</div></div>${a.novo ? '<span class="pill v dir">NOVO</span>' : a.parado ? '<span class="pill c dir">PARADO</span>' : ""}</div></div>`).join("");
-  } else if (estado.subPortal === "aviso") {
-    const opcoes = estado.dados.projetos.map((p) => `<option value="${esc(p.id)}">${esc(p.codigo)} ${esc(p.nome)}</option>`).join("");
-    corpo = `<div class="card"><select class="campo" id="aviso-projeto" style="margin-top:0">${opcoes}</select><textarea class="campo" id="aviso-texto" placeholder="Escreva o aviso para o portal…"></textarea><button class="btn" data-acao="publicar-aviso">Publicar no portal</button></div>`;
+  if (sub === "acessos") {
+    corpo = (d.acessos || []).filter((a) => a.projeto === p.codigo).map((a) => `<div class="card"><div class="linha"><div class="t"><b>${esc(a.cliente)}</b><div class="p">${esc(a.quando)}${a.total ? ` · ${a.total} acessos` : ""}</div></div>${a.novo ? '<span class="pill v dir">NOVO</span>' : a.parado ? '<span class="pill c dir">PARADO</span>' : ""}</div></div>`).join("") || '<div class="vazio">Nenhum acesso recente neste projeto.</div>';
+  } else if (sub === "aviso") {
+    corpo = `<h2 class="sec">Avisar o cliente</h2><div class="card"><textarea class="campo" id="aviso-texto" placeholder="Escreva o aviso para o portal…"></textarea><button class="btn" data-acao="publicar-aviso" data-projeto="${esc(p.id)}">Publicar no portal</button></div>`;
+  } else if (sub === "atividade") {
+    corpo = (d.atividade || []).filter((a) => String(a.detalhe || "").startsWith(p.codigo)).map((a) => `<div class="card"><div class="linha"><div class="t">${esc(a.titulo)}<div class="p">${esc(a.detalhe)}</div></div><span class="pill ${a.tipo} dir"></span></div></div>`).join("") || '<div class="vazio">Nenhuma atividade recente neste projeto.</div>';
   } else {
-    corpo = d.atividade.map((a) => `<div class="card"><div class="linha"><div class="t">${esc(a.titulo)}<div class="p">${esc(a.detalhe)}</div></div><span class="pill ${a.tipo} dir"></span></div></div>`).join("");
+    corpo = blocoEntregas(p);
   }
-  return `<h1>Portal do cliente</h1><div class="seg">${abas.map(([k, n]) => `<button data-subportal="${k}" class="${estado.subPortal === k ? "on" : ""}">${n}</button>`).join("")}</div>${corpo}`;
+  return `<div class="seg">${abas.map(([k, n]) => `<button data-subportal="${k}" class="${sub === k ? "on" : ""}">${n}</button>`).join("")}</div>${corpo}`;
 }
 
 const MESES_NOME = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -380,7 +383,7 @@ function telaSemDados() {
 function desenhar() {
   if (!estado.dados) { $("#app").innerHTML = telaSemDados(); desenharAbas(); return; }
   if (!notasVistasEm()) marcarNotasVistas();             // 1ª vez: o que já existe não conta como "nova"
-  const telas = { hoje: telaHoje, projetos: telaProjetos, ideias: telaIdeias, portal: telaPortal, financeiro: telaFinanceiro, mais: telaMais, notas: telaNotas, leads: telaLeads };
+  const telas = { hoje: telaHoje, projetos: telaProjetos, ideias: telaIdeias, financeiro: telaFinanceiro, mais: telaMais, notas: telaNotas, leads: telaLeads };
   const y = window.scrollY;
   $("#app").innerHTML = telas[estado.aba]();
   desenharAbas();
@@ -693,7 +696,7 @@ document.addEventListener("click", async (e) => {
   let el;
   if ((el = q("[data-aba]"))) { estado.aba = el.dataset.aba; estado.projeto = null; desenhar(); window.scrollTo(0, 0); if (estado.aba === "financeiro" && !estado.liberado) liberarFinanceiro(); return; }
   if ((el = q("[data-aba-ir]"))) { estado.aba = el.dataset.abaIr; if (estado.aba === "notas") marcarNotasVistas(); desenhar(); window.scrollTo(0, 0); return; }
-  if ((el = q("[data-projeto]"))) { estado.projeto = el.dataset.projeto; estado.subProjeto = "resumo"; desenhar(); window.scrollTo(0, 0); return; }
+  if ((el = q("[data-projeto]"))) { estado.projeto = el.dataset.projeto; estado.subProjeto = "resumo"; estado.subPortal = "entregas"; desenhar(); window.scrollTo(0, 0); return; }
   if ((el = q("[data-subprojeto]"))) { estado.subProjeto = el.dataset.subprojeto; desenhar(); return; }
   if ((el = q("[data-obra-item]"))) { abrirItemObra(el.dataset.obraItem); return; }
   if ((el = q("[data-nota-editar]"))) { abrirNota(el.dataset.notaEditar); return; }
