@@ -189,7 +189,7 @@ function telaProjetos() {
   if (estado.projeto) {
     const p = d.projetos.find((x) => x.id === estado.projeto);
     if (!p) { estado.projeto = null; return telaProjetos(); }
-    const abas = [["resumo", "Resumo"], ["tarefas", "Tarefas"], ["notas", "Notas"], ["portal", "Portal"]];
+    const abas = [["resumo", "Resumo"], ["tarefas", "Tarefas"], ["cronograma", "Cronograma"], ["orcamento", "Orçamento"], ["notas", "Notas"], ["portal", "Portal"]];
     let corpo = "";
     if (estado.subProjeto === "resumo") {
       corpo = `<h2 class="sec">Andamento</h2><div class="card">${p.frentes.map((f) => `<div class="linha" style="margin-bottom:10px"><div class="t">${esc(f.nome)}<div class="barra"><i style="width:${f.pct}%"></i></div></div><span class="val dir">${f.pct}%</span></div>`).join("")}</div>
@@ -198,6 +198,10 @@ function telaProjetos() {
     } else if (estado.subProjeto === "tarefas") {
       corpo = `<h2 class="sec">Tarefas · ${p.tarefas.filter((t) => !t.feita).length} abertas</h2><button class="btn o atalho" data-acao="nova-tarefa">+ Nova tarefa</button>` +
         (p.tarefas.map((t) => `<div class="card"><div class="linha"><button class="check ${t.feita ? "ok" : ""}" data-tarefa="${esc(t.id)}" aria-label="Concluir"></button><div class="t ${t.feita ? "feita" : ""}">${esc(t.titulo)}</div></div></div>`).join("") || '<div class="vazio">Sem tarefas.</div>');
+    } else if (estado.subProjeto === "cronograma") {
+      corpo = corpoCronograma(p);
+    } else if (estado.subProjeto === "orcamento") {
+      corpo = corpoObra(p);
     } else if (estado.subProjeto === "notas") {
       corpo = blocoNotas(p.codigo);
     } else {
@@ -228,7 +232,12 @@ const quandoNota = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : `$
 function cartaoNota(n) {
   const resto = String(n.texto || "").split("\n").slice(1).join("\n").trim();
   const projeto = n.projeto ? `<span class="pill c">${esc(n.projeto)}</span>` : "";
-  return `<details class="card nota${n.pendente ? " pendente" : ""}"><summary><span class="t"><b>${esc(n.titulo)}</b><span class="p">${esc(quandoNota(n.atualizado))}${n.pendente ? " · aguardando o Dudoo" : ""}</span></span>${projeto}</summary>
+  if (!n.gerada && !n.longa && !n.pendente && !String(n.id).startsWith("novo-")) {      // toque abre pra EDITAR (17/10/2026)
+    return `<div class="card nota toque" data-nota-editar="${esc(n.id)}"><div class="linha"><div class="t"><b>${esc(n.titulo)}</b><div class="p">${esc(quandoNota(n.atualizado))}</div>
+      ${resto ? `<div class="nota-previa">${esc(resto.slice(0, 160))}</div>` : ""}</div>${projeto}</div></div>`;
+  }
+  const aviso = n.gerada ? "gerada pelo Dudoo (só leitura)" : n.longa ? "nota longa: edite no Dudoo" : "";
+  return `<details class="card nota${n.pendente ? " pendente" : ""}"><summary><span class="t"><b>${esc(n.titulo)}</b><span class="p">${esc(quandoNota(n.atualizado))}${n.pendente ? " · aguardando o Dudoo" : ""}${aviso ? " · " + aviso : ""}</span></span>${projeto}</summary>
     <div class="nota-texto">${esc(resto || "(sem mais texto)")}</div></details>`;
 }
 function blocoNotas(codigo) {
@@ -237,6 +246,19 @@ function blocoNotas(codigo) {
   return `<div class="card"><select class="campo" id="nota-projeto" style="margin-top:0">${opcoes}</select>
       <textarea class="campo" id="nota-texto" placeholder="Escreva a nota…"></textarea><button class="btn" data-acao="salvar-nota">Salvar nota</button></div>
     <h2 class="sec">${lista.length} nota(s)</h2>${lista.map(cartaoNota).join("") || '<div class="vazio">Nenhuma nota.</div>'}`;
+}
+function abrirNota(id) {
+  const n = todasNotas().find((x) => x.id === id);
+  if (!n) return;
+  abrirFolha("Editar nota", `<textarea class="campo" id="nota-ed" style="min-height:280px">${esc(n.texto)}</textarea><div class="mini">A 1ª linha é o título. Salvar edita esta nota (não cria outra).</div>`, "Salvar", () => {
+    const texto = ($("#nota-ed").value || "").trim();
+    if (!texto) { avisar("A nota não pode ficar vazia."); return false; }
+    if (texto === String(n.texto || "").trim()) { avisar("Nada mudou."); return false; }
+    comando("editar_nota", { nota_id: n.id, texto, base: n.atualizado }, () => {
+      n.texto = texto; n.titulo = texto.split("\n")[0].slice(0, 80); n.atualizado = new Date().toISOString(); n.pendente = true;
+    });
+    avisar("Nota guardada. O Dudoo grava e manda pro Simplenote quando estiver aberto.");
+  });
 }
 function telaNotas() {
   const filtro = estado.filtroNotas;
@@ -364,6 +386,7 @@ function desenhar() {
   desenharAbas();
   window.scrollTo(0, y);
   if (estado.aba === "ideias") ligarLeque();
+  if (estado.aba === "projetos" && estado.projeto && estado.subProjeto === "cronograma") montarCronograma();
 }
 
 // ---------------------------------------------------------------- ideias (Central de Conteúdo) — leque "de cinema"
@@ -539,6 +562,117 @@ function acaoIdeia(id, acao) {
   avisar({ aceitar: "Ideia aceita.", executado: "Marcada como executada.", adiar: "Ideia adiada.", descartar: "Ideia descartada." }[acao]);
 }
 
+
+// ---------------------------------------------------------------- obra: cronograma e orçamento (17/10/2026)
+// O desenho do cronograma é o MESMO do portal do cliente (cronograma.js, gerado por tools/gerar_cronograma_dudoo_web.py).
+const projetoAtual = () => ((estado.dados && estado.dados.projetos) || []).find((x) => x.id === estado.projeto);
+const hojeISO = () => new Date().toISOString().slice(0, 10);
+const brCompleta = (iso) => { const [a, m, d] = String(iso || "").slice(0, 10).split("-"); return d ? `${d}/${m}/${a}` : "—"; };
+
+function corpoCronograma(p) {
+  if (!p.cronograma) return '<div class="vazio">Sem cronograma por aqui: o projeto ainda não tem um no Dudoo, ou o Dudoo aberto no computador é de uma versão que ainda não envia o cronograma.</div>';
+  return `<div class="cg-moldura"><div id="cg-caixa"></div></div><div class="mini" style="margin-top:8px">Toque numa etapa para ajustar % executado, datas e duração. O Dudoo grava quando estiver aberto.</div>`;
+}
+
+function montarCronograma() {
+  const p = projetoAtual(), caixa = $("#cg-caixa");
+  if (!p || !p.cronograma || !caixa || !window.CronogramaObra) return;
+  window.__cgAoEtapa = (_id, etapaId, nome) => abrirEtapa(etapaId, nome);
+  window.CronogramaObra.montar(caixa, p.id, p.cronograma);
+}
+
+function abrirEtapa(etapaId, nome) {
+  const p = projetoAtual(), l = p && p.cronograma && p.cronograma.linhas.find((x) => x.id === etapaId);
+  if (!l) return;
+  const pend = estado.fila.some((i) => i.status === "pendente" && i.payload.etapa_id === etapaId);
+  const campos = `<div class="mini">${esc(nome || l.nome)} · previsto ${brCompleta(l.inicio)} → ${brCompleta(l.fim)}${pend ? " · alteração aguardando o Dudoo" : ""}</div>
+    <label class="rot">% executado: <b id="e-prog-v">${Number(l.progresso) || 0}%</b></label>
+    <input type="range" id="e-prog" min="0" max="100" step="5" value="${Number(l.progresso) || 0}" style="width:100%" oninput="document.getElementById('e-prog-v').textContent=this.value+'%'">
+    <label class="rot">Início previsto <span class="mini">(passa a data fixa; as etapas que dependem dela se ajustam)</span></label><input class="campo" id="e-ini" type="date" value="${esc(l.inicio || "")}">
+    <label class="rot">Duração (dias úteis)</label><input class="campo" id="e-dur" type="number" inputmode="numeric" min="1" value="${Number(l.dias_uteis) || 1}">
+    <label class="rot">Início real</label><input class="campo" id="e-ri" type="date" value="${esc(l.real_inicio || "")}">
+    <label class="rot">Término real</label><input class="campo" id="e-rf" type="date" value="${esc(l.real_fim || "")}">`;
+  abrirFolha("Ajustar etapa", campos, "Salvar", () => {
+    const novo = { prog: Number($("#e-prog").value), ini: $("#e-ini").value, dur: Number($("#e-dur").value), ri: $("#e-ri").value, rf: $("#e-rf").value };
+    const payload = { projeto: p.codigo, etapa_id: etapaId };
+    if (novo.prog !== (Number(l.progresso) || 0)) payload.progresso = novo.prog;
+    if (novo.ini && novo.ini !== l.inicio) payload.data_inicio = novo.ini;
+    if (novo.dur && novo.dur !== (Number(l.dias_uteis) || 1)) payload.duracao_dias = novo.dur;
+    if (novo.ri !== (l.real_inicio || "")) payload.data_inicio_real = novo.ri;
+    if (novo.rf !== (l.real_fim || "")) payload.data_fim_real = novo.rf;
+    if (novo.ri && novo.rf && novo.rf < novo.ri) { avisar("O término real não pode ser antes do início real."); return false; }
+    if (Object.keys(payload).length === 2) { avisar("Nada mudou."); return false; }
+    comando("cronograma_etapa", payload, () => {
+      if (payload.progresso !== undefined) { l.progresso = payload.progresso; if (payload.progresso >= 100 && !l.real_fim) l.real_fim = hojeISO(); }
+      if ("data_inicio_real" in payload) l.real_inicio = payload.data_inicio_real;
+      if ("data_fim_real" in payload) l.real_fim = payload.data_fim_real;
+    });
+    avisar(payload.data_inicio || payload.duracao_dias ? "Enviado. O Dudoo recalcula as datas quando estiver aberto." : "Enviado ao Dudoo.");
+  });
+}
+
+const FILTROS_OBRA = [["todos", "Todos"], ["faltam", "Falta comprar"], ["contratados", "Contratados"]];
+const FALTAM = ["A cotar", "Cotação solicitada", "Cotado"], FECHADOS = ["Contratado", "Concluído"];
+
+function corpoObra(p) {
+  const o = p.orcamento;
+  if (!o) return '<div class="vazio">Sem orçamento por aqui: o projeto ainda não tem um no Dudoo, ou o Dudoo aberto no computador é de uma versão que ainda não envia o orçamento.</div>';
+  const filtro = estado.filtroObra || "todos";
+  const passa = (i) => filtro === "todos" || (filtro === "faltam" ? FALTAM.includes(i.st) : FECHADOS.includes(i.st));
+  const pill = (st) => `<span class="pill ${FECHADOS.includes(st) ? "v" : FALTAM.includes(st) ? "a" : ""}">${esc(st)}</span>`;
+  const porCat = {};
+  o.itens.filter(passa).forEach((i) => { (porCat[i.cat || "Sem categoria"] = porCat[i.cat || "Sem categoria"] || []).push(i); });
+  const cats = Object.keys(porCat).map((c) => {
+    const lista = porCat[c], soma = lista.reduce((t, i) => t + (FECHADOS.includes(i.st) && i.contr ? i.contr : i.orc), 0);
+    return `<details class="card obra-cat"${filtro !== "todos" ? " open" : ""}><summary><b>${esc(c)}</b><span class="val dir">${brl(soma)}</span><div class="p">${lista.length} ${lista.length === 1 ? "item" : "itens"}</div></summary>
+      ${lista.map((i) => `<div class="linha obra-item" data-obra-item="${esc(i.id)}"><div class="t">${esc(i.nome)}<div class="p">${[i.amb, i.forn, i.qtd ? `${String(i.qtd).replace(".", ",")} ${i.un || ""}`.trim() : ""].filter(Boolean).map(esc).join(" · ")} ${pill(i.st)}${i.prazo ? ` · ${esc(i.prazo)}` : ""}</div></div>
+        <span class="val dir">${brl(FECHADOS.includes(i.st) && i.contr ? i.contr : i.orc)}</span></div>`).join("")}</details>`;
+  }).join("");
+  return `<div class="kpis"><div class="kpi"><small>Orçado</small><strong>${brl(o.total_orcado)}</strong><small>${o.faltam} falta(m) comprar</small></div>
+    <div class="kpi"><small>Contratado</small><strong>${brl(o.total_contratado)}</strong><small>Pago ${brl(o.total_pago)} · saldo ${brl(o.saldo)}</small></div></div>
+    <select class="campo" id="obra-filtro">${FILTROS_OBRA.map(([k, n]) => `<option value="${k}" ${k === filtro ? "selected" : ""}>${n}</option>`).join("")}</select>
+    ${o.itens_omitidos ? '<div class="vazio">Os itens deste orçamento só aparecem no Dudoo (a foto ficou pesada demais).</div>' : cats || '<div class="vazio">Nenhum item neste filtro.</div>'}<div class="mini" style="margin-top:8px">Toque num item para mudar a situação, o valor ou o prazo.</div>`;
+}
+
+function abrirItemObra(itemId) {
+  const p = projetoAtual(), i = p && p.orcamento && p.orcamento.itens.find((x) => x.id === itemId);
+  if (!i) return;
+  const pend = estado.fila.some((x) => x.status === "pendente" && x.payload.item_id === itemId);
+  const opcoes = p.orcamento.situacoes.map((s) => `<option value="${esc(s)}" ${s === i.st ? "selected" : ""}>${esc(s)}</option>`).join("");
+  const campos = `<div class="mini">${esc(i.nome)}${pend ? " · alteração aguardando o Dudoo" : ""}</div>
+    <label class="rot">Situação</label><select class="campo" id="o-st">${opcoes}</select>
+    <label class="rot">Valor orçado (total, R$)</label><input class="campo" id="o-orc" inputmode="decimal" value="${i.orc ? String(i.orc).replace(".", ",") : ""}">
+    <label class="rot">Quantidade</label><input class="campo" id="o-qtd" inputmode="decimal" value="${i.qtd != null ? String(i.qtd).replace(".", ",") : ""}">
+    <label class="rot">Valor contratado (total, R$) <span class="mini">— só ao marcar Contratado</span></label><input class="campo" id="o-contr" inputmode="decimal" value="${i.contr ? String(i.contr).replace(".", ",") : ""}">
+    <label class="rot">Prazo de entrega</label><input class="campo" id="o-prazo" value="${esc(i.prazo || "")}" placeholder="Ex.: 30 dias úteis">
+    <label class="rot">Fornecedor</label><input class="campo" id="o-forn" value="${esc(i.forn || "")}">
+    <label class="rot">Motivo <span class="mini">— só ao marcar "Não comprar agora"</span></label><input class="campo" id="o-motivo">`;
+  abrirFolha("Item do orçamento", campos, "Salvar", () => {
+    const st = $("#o-st").value, payload = { projeto: p.codigo, item_id: itemId };
+    const orc = numeroBr($("#o-orc").value), qtd = numeroBr($("#o-qtd").value), contr = numeroBr($("#o-contr").value);
+    if (st !== i.st) payload.status = st;
+    if (!Number.isNaN(orc) && orc !== (i.orc || 0)) payload.valor_orcado = orc;
+    if (!Number.isNaN(qtd) && qtd !== Number(i.qtd)) payload.quantidade = qtd;
+    if ($("#o-prazo").value.trim() !== (i.prazo || "")) payload.prazo_entrega = $("#o-prazo").value.trim();
+    if ($("#o-forn").value.trim() !== (i.forn || "")) payload.fornecedor = $("#o-forn").value.trim();
+    if (st === "Contratado" && st !== i.st) {
+      if (Number.isNaN(contr) || contr <= 0) { avisar("Informe o valor contratado."); return false; }
+      payload.valor_contratado = contr;
+    }
+    if (payload.status === "Não comprar agora" && $("#o-motivo").value.trim()) payload.motivo = $("#o-motivo").value.trim();
+    if (Object.keys(payload).length === 2) { avisar("Nada mudou."); return false; }
+    comando("orcamento_item", payload, () => {
+      if (payload.status) i.st = payload.status;
+      if (payload.valor_orcado !== undefined) i.orc = payload.valor_orcado;
+      if (payload.quantidade !== undefined) i.qtd = payload.quantidade;
+      if (payload.valor_contratado !== undefined) i.contr = payload.valor_contratado;
+      if (payload.prazo_entrega !== undefined) i.prazo = payload.prazo_entrega;
+      if (payload.fornecedor !== undefined) i.forn = payload.fornecedor;
+    });
+    avisar("Enviado ao Dudoo. Os totais atualizam quando ele gravar.");
+  });
+}
+
 // ---------------------------------------------------------------- ações
 document.addEventListener("click", async (e) => {
   const q = (s) => e.target.closest(s);
@@ -548,6 +682,8 @@ document.addEventListener("click", async (e) => {
   if ((el = q("[data-aba-ir]"))) { estado.aba = el.dataset.abaIr; if (estado.aba === "notas") marcarNotasVistas(); desenhar(); window.scrollTo(0, 0); return; }
   if ((el = q("[data-projeto]"))) { estado.projeto = el.dataset.projeto; estado.subProjeto = "resumo"; desenhar(); window.scrollTo(0, 0); return; }
   if ((el = q("[data-subprojeto]"))) { estado.subProjeto = el.dataset.subprojeto; desenhar(); return; }
+  if ((el = q("[data-obra-item]"))) { abrirItemObra(el.dataset.obraItem); return; }
+  if ((el = q("[data-nota-editar]"))) { abrirNota(el.dataset.notaEditar); return; }
   if ((el = q("[data-subportal]"))) { estado.subPortal = el.dataset.subportal; desenhar(); return; }
   if ((el = q("[data-fin]"))) { estado.fin = el.dataset.fin; desenhar(); return; }
   if ((el = q("[data-mes]"))) {
@@ -743,6 +879,7 @@ document.addEventListener("click", async (e) => {
 });
 document.addEventListener("change", async (e) => {
   if (e.target && e.target.id === "nota-filtro") { estado.filtroNotas = e.target.value; desenhar(); return; }
+  if (e.target && e.target.id === "obra-filtro") { estado.filtroObra = e.target.value; desenhar(); return; }
   if (e.target && e.target.id === "ideia-arquivo") {
     const t = $("#ideia-texto"); if (t) estado.captura.texto = t.value;
     const l = $("#ideia-link"); if (l) estado.captura.link = l.value;

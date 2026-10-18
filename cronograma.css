@@ -1,0 +1,122 @@
+/* GERADO por tools/gerar_cronograma_dudoo_web.py a partir do portal do cliente — não edite à mão. */
+  /* Cronograma de obra (27/09/2026) — porte do desenho do Dudoo
+     (app/services/cronograma_obra_html_service.py, _MODELO_HTML) pro
+     portal. Tudo com prefixo cg- pra não bater com .linha/.bloco/
+     .categoria/.marco etc. do portal; as cores ficam em variáveis do
+     próprio container (não no :root). */
+  .cg-cronograma {
+    --cg-fundo: #ffffff; --cg-texto: #1d1d1b; --cg-texto-2: #6b6b66; --cg-linha: #ececea;
+    --cg-fds: #f6f6f4; --cg-recesso: #dcdcd8; --cg-cabecalho: #2b2b29; --cg-hoje: #c0392b;
+    --cg-marco: #ffc000; --cg-marco-geral: #2e7d32; --cg-concluida: #2e7d32;
+    --cg-col-nome: 260px; --cg-alt-linha: 30px;
+    position: relative;
+    max-width: 100%;
+    min-width: 0;
+    color: var(--cg-texto);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .cg-cronograma * { box-sizing: border-box; }
+  .cg-carregando { color: #999; font-size: 12px; padding: 6px 0; }
+  .cg-cabecalho { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+    gap: 8px 16px; margin-bottom: 10px; }
+  .cg-resumo { flex: 1 1 240px; min-width: 0; color: var(--cg-texto-2); font-size: 12.5px; }
+  .cg-resumo strong { color: var(--cg-texto); }
+  .cg-atualizado { font-size: 11px; color: #999; margin-top: 2px; }
+  .cg-ferramentas { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .cg-grupo { display: inline-flex; border: 1px solid #d6d6d2; border-radius: 3px; overflow: hidden; background: #fff; }
+  .cg-grupo button, .cg-botao { border: 0; background: #fff; padding: 6px 11px; font-family: inherit;
+    font-size: 12px; color: var(--cg-texto-2); cursor: pointer; }
+  .cg-grupo button + button { border-left: 1px solid #d6d6d2; }
+  .cg-grupo button.cg-ativo { background: var(--cg-cabecalho); color: #fff; }
+  .cg-botao { border: 1px solid #d6d6d2; border-radius: 3px; }
+  /* max-height em px além do vh: o #html1 do Wix tem ~2000px de altura, então
+     75vh nunca limitava a caixa e a linha das datas rolava junto com a página. */
+  .cg-rolagem { overflow: auto; -webkit-overflow-scrolling: touch; max-width: 100%; max-height: min(75vh, 600px);
+    border: 1px solid var(--cg-linha); border-radius: 3px; background: var(--cg-fundo); position: relative; }
+  .cg-grade { position: relative; }
+  .cg-linha { display: flex; height: var(--cg-alt-linha); }
+  .cg-nome { position: -webkit-sticky; position: sticky; left: 0; z-index: 3; flex: 0 0 var(--cg-col-nome); width: var(--cg-col-nome);
+    background: var(--cg-fundo); border-right: 1px solid var(--cg-linha); border-bottom: 1px solid var(--cg-linha);
+    padding: 0 10px; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden;
+    font-size: 13px; cursor: default; }
+  .cg-nome .cg-num { color: var(--cg-texto-2); min-width: 22px; text-align: right; flex: 0 0 auto; }
+  .cg-nome .cg-txt { overflow: hidden; text-overflow: ellipsis; }
+  .cg-nome.cg-geral { font-weight: 600; font-style: italic; }
+  .cg-selo { flex: 0 0 auto; font-size: 12px; line-height: 1; }
+  .cg-selo.cg-ok { color: var(--cg-concluida); font-weight: 700; }
+  .cg-selo.cg-andamento { width: 8px; height: 8px; border-radius: 50%; background: var(--cg-hoje); }
+  .cg-trilho { position: relative; flex: 0 0 auto; border-bottom: 1px solid var(--cg-linha); }
+  .cg-linha.cg-topo { position: -webkit-sticky; position: sticky; top: 0; z-index: 5; background: var(--cg-fundo); height: 44px; }
+  .cg-topo .cg-nome { z-index: 6; height: 44px; align-items: flex-end; padding-bottom: 6px;
+    font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--cg-texto-2); }
+  .cg-topo .cg-trilho { height: 44px; }
+  .cg-mes { position: absolute; top: 0; height: 22px; background: var(--cg-cabecalho); color: #fff;
+    font-size: 11px; font-weight: 600; letter-spacing: .06em; display: flex; align-items: center;
+    padding-left: 6px; border-right: 1px solid #fff; overflow: hidden; white-space: nowrap; }
+  .cg-dia { position: absolute; top: 22px; height: 22px; font-size: 10px; color: var(--cg-texto-2);
+    display: flex; align-items: center; justify-content: center; border-right: 1px solid var(--cg-linha); }
+  .cg-dia.cg-fds { background: var(--cg-fds); }
+  .cg-fundos { position: absolute; top: 44px; bottom: 0; left: var(--cg-col-nome); pointer-events: none; }
+  .cg-fundo { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+  .cg-fundo.cg-fds { background: var(--cg-fds); }
+  .cg-fundo.cg-recesso { background: repeating-linear-gradient(45deg, var(--cg-recesso) 0 4px, #ecece9 4px 8px); }
+  .cg-fundo.cg-hoje { width: 2px; background: var(--cg-hoje); z-index: 2; }
+  .cg-hoje-rotulo { position: absolute; top: 24px; z-index: 6; transform: translateX(-50%);
+    background: var(--cg-hoje); color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 3px; }
+  .cg-barra { position: absolute; top: 7px; height: 16px; border-radius: 3px; cursor: pointer; }
+  .cg-barra.cg-restante { opacity: .3; }
+  .cg-pct { margin-left: auto; font-size: 11px; color: var(--cg-texto-2); flex: 0 0 auto; }
+  .cg-pct.cg-atrasada { color: var(--cg-hoje); font-weight: 600; }
+  .cg-losango { position: absolute; top: 8px; width: 14px; height: 14px; transform: translateX(-50%) rotate(45deg);
+    border: 1px solid rgba(0,0,0,.45); cursor: pointer; z-index: 1; }
+  .cg-legenda { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 2px 0; color: var(--cg-texto-2);
+    font-size: 11.5px; }
+  .cg-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+  .cg-amostra { width: 14px; height: 10px; border-radius: 2px; display: inline-block; flex: 0 0 auto; }
+  .cg-dica { position: absolute; z-index: 20; pointer-events: none; background: var(--cg-cabecalho); color: #fff;
+    border-radius: 3px; padding: 8px 10px; font-size: 12px; max-width: 260px; display: none;
+    box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+  .cg-dica b { display: block; font-size: 13px; margin-bottom: 2px; }
+  @media (max-width: 700px) {
+    .cg-cronograma { --cg-col-nome: 150px; --cg-alt-linha: 28px; }
+    .cg-nome { font-size: 12px; padding: 0 6px; }
+    .cg-nome .cg-num { min-width: 16px; }
+    .cg-rolagem { max-height: min(70vh, 560px); }
+  }
+  /* Celular estreito: o portal já gasta ~90px de margens; sobra pouco
+     pro gráfico com a coluna de 150px. O nome inteiro aparece na dica. */
+  @media (max-width: 480px) {
+    .cg-cronograma { --cg-col-nome: 128px; }
+    .cg-nome .cg-num { min-width: 14px; }
+  }
+  /* Toque (celular/tablet): sem caixa com rolagem própria — ela "prende" o
+     dedo no iPhone; quem rola é a página. Com mouse a caixa fica e a linha
+     das datas gruda no topo dela (28/09/2026). */
+  @media (hover: none), (pointer: coarse) {
+    .cg-rolagem { max-height: none; }
+    .cg-so-mouse { display: none !important; }
+  }
+  /* Cronograma no celular em LISTA (30/09/2026, Eduardo: "no celular o
+     cronograma ficou ruim de ver") — o gráfico continua no botão Gráfico. */
+  .cg-lista { display: none; }
+  .cg-modo-lista .cg-lista { display: block; }
+  .cg-modo-lista .cg-rolagem, .cg-modo-lista .cg-legenda, .cg-modo-lista .cg-escalas,
+  .cg-modo-lista .cg-ir-hoje { display: none; }
+  .cg-li-secao { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--cg-texto-2);
+    margin: 14px 0 6px; font-weight: 600; }
+  .cg-li { display: flex; gap: 8px; align-items: flex-start; background: #fff; border: 1px solid var(--cg-linha);
+    border-left: 4px solid #4472C4; border-radius: 3px; padding: 8px 10px; margin-bottom: 6px; }
+  .cg-li-corpo { flex: 1; min-width: 0; }
+  .cg-li-nome { font-weight: 600; font-size: 14px; line-height: 1.35; }
+  .cg-li-datas { font-size: 12.5px; color: var(--cg-texto-2); margin-top: 2px; }
+  .cg-li-sub { font-size: 12px; color: var(--cg-texto-2); margin-top: 2px; }
+  .cg-li-tag { font-size: 11px; font-weight: 600; margin-left: 6px; color: var(--cg-texto-2); white-space: nowrap; }
+  .cg-li-tag.cg-li-atrasada { color: var(--cg-hoje); }
+  .cg-li-tag.cg-li-ok { color: var(--cg-concluida); }
+  .cg-li.cg-li-marco { border-left-color: var(--cg-marco-geral); align-items: center; }
+  .cg-li-losango { width: 10px; height: 10px; transform: rotate(45deg); background: var(--cg-marco-geral);
+    flex: 0 0 auto; margin: 0 3px; }
+  .cg-li-passadas > summary { cursor: pointer; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--cg-texto-2); margin: 14px 0 6px; font-weight: 600; }
+  .cg-li-vazio { font-size: 12.5px; color: var(--cg-texto-2); padding: 4px 0; }
