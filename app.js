@@ -193,6 +193,7 @@ function telaHoje() {
     <button class="atualizar" data-acao="atualizar">Atualizar</button></div></div>
     <form class="perg" data-form="pergunta"><input id="pergunta" placeholder="Pergunte ou peça algo ao Dudoo…" autocomplete="off"><button>Enviar</button></form>
     <button class="btn o atalho" data-acao="nova-tarefa">+ Nova tarefa</button>
+    <button class="btn o atalho" data-acao="cadastro-lead">Cadastro de leads</button>
     ${estado.demo ? '<div class="card toque" data-aba-ir="mais"><div class="t"><b>Conectar ao Dudoo</b><div class="p">Você está vendo dados de exemplo. Toque para colar o link de conexão.</div></div></div>' : ""}
     ${estado.erroConexao ? `<div class="card pendente"><div class="p" style="margin:0">${esc(estado.erroConexao)} Mostrando os últimos dados.</div></div>` : ""}
     <h2 class="sec">Precisa de você · ${d.hoje.precisa.length}</h2>
@@ -305,6 +306,7 @@ function telaLeads() {
     ${l.devido && l.texto ? `<div class="p" style="margin:6px 0">${esc(l.texto.slice(0, 160))}${l.texto.length > 160 ? "…" : ""}</div>` : ""}
     ${l.telefone ? `<button class="btn peq" data-lead-wa="${esc(l.id)}">WhatsApp${l.devido ? " com a mensagem" : ""}</button>` : '<div class="p">Sem telefone cadastrado.</div>'}</div>`;
   return `<button class="voltar" data-acao="voltar-hoje">‹ Hoje</button><h1>Leads</h1><div class="mini">${lista.length} em andamento · ${leadsDevidos()} com follow-up hoje</div>
+    <button class="btn o atalho" data-acao="cadastro-lead">+ Cadastro de leads</button>
     ${aguarda ? `<div class="card toque" data-lead-confirmar="1"><div class="t"><b>Você enviou a mensagem para ${esc(aguarda.nome)}?</b><div class="p">Toque para confirmar e registrar o contato.</div></div></div>` : ""}
     ${lista.map(cartao).join("") || '<div class="vazio">Nenhum lead em andamento.</div>'}`;
 }
@@ -881,6 +883,15 @@ document.addEventListener("click", async (e) => {
       comando("publicar_aviso", { projeto, texto: texto.trim() });
       avisar("Aviso enviado para publicação no portal.");
       if ($("#aviso-texto")) $("#aviso-texto").value = "";
+    } else if (a === "cadastro-lead") {
+      // Cadastro de leads (18/10/2026): cola o texto que a agência manda ("Novo Lead Cadastrado! Nome: … Telefone: …") e o Dudoo cadastra como o atalho "Cadastre o lead:".
+      abrirFolha("Cadastro de leads", `<label class="rot">Texto do lead (cole como a agência mandou)</label><textarea class="campo" id="lead-texto" style="min-height:240px" placeholder="🎉 Novo Lead Cadastrado! 🎉&#10;Nome: …&#10;Telefone: …&#10;Tipo do Imóvel: …&#10;Tamanho (m²): …&#10;Localização: …&#10;Criativo: …"></textarea><div class="mini">O Dudoo do computador cadastra o lead quando estiver aberto.</div>`, "Cadastrar lead", () => {
+        const texto = ($("#lead-texto").value || "").trim();
+        if (!texto) { avisar("Cole o texto do lead."); return false; }
+        if (!/nome\s*:/i.test(texto)) { avisar('Não achei a linha "Nome:" no texto.'); return false; }
+        comando("cadastrar_lead", { texto });
+        avisar("Lead enviado. O Dudoo cadastra quando estiver aberto.");
+      });
     } else if (a === "nova-tarefa") {
       const hoje = new Date().toISOString().slice(0, 10);
       const projetos = (d.projetos || []).filter((p) => p.estado === "ativo")
