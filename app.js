@@ -1046,6 +1046,7 @@ function garantirQuadroJs() {
   const s = document.createElement("script");
   s.src = "quadro.js?v=28"; s.dataset.quadroJs = "1";
   s.onload = () => { if (estado.dados && estado.aba === "ferramentas") desenhar(); };
+  s.onerror = () => { document.querySelectorAll(".vazio").forEach((v) => { if (/Carregando o Quadro/.test(v.textContent)) v.textContent = "Não consegui carregar o Quadro (sem conexão?). Feche e abra o app de novo."; }); };
   document.body.appendChild(s);
 }
 
