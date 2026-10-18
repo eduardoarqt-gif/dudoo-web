@@ -411,7 +411,8 @@ const SUBS_FERRAMENTAS = [["geral", "Geral"], ["notas", "Notas"], ["quadro", "Qu
 function telaFerramentas() {
   const sub = estado.subFerr || "geral";
   const menu = `<div class="seg">${SUBS_FERRAMENTAS.map(([k, nome]) => `<button class="${sub === k ? "on" : ""}" data-sub-ferr="${k}">${nome}${k === "notas" && novasNotas() ? ` · ${novasNotas()}` : ""}</button>`).join("")}</div>`;
-  const corpo = sub === "notas" ? telaNotas(true) : sub === "quadro" ? (typeof telaQuadroLista === "function" ? telaQuadroLista() : "") : telaMais();
+  if (sub === "quadro" && typeof telaQuadroLista !== "function") garantirQuadroJs();
+  const corpo = sub === "notas" ? telaNotas(true) : sub === "quadro" ? (typeof telaQuadroLista === "function" ? telaQuadroLista() : '<div class="vazio">Carregando o Quadro…</div>') : telaMais();
   return `<h1>Ferramentas</h1>${menu}${corpo}`;
 }
 
@@ -1039,7 +1040,17 @@ function lerLinkDeConexao() {
   }
 }
 
+// O Quadro (quadro.js) é carregado daqui se o index.html em cache for de antes dele existir (iOS guarda o index.html por mais tempo que o app.js).
+function garantirQuadroJs() {
+  if (typeof telaQuadroLista === "function" || document.querySelector('script[data-quadro-js]')) return;
+  const s = document.createElement("script");
+  s.src = "quadro.js?v=28"; s.dataset.quadroJs = "1";
+  s.onload = () => { if (estado.dados && estado.aba === "ferramentas") desenhar(); };
+  document.body.appendChild(s);
+}
+
 (async function iniciar() {
+  garantirQuadroJs();
   lerLinkDeConexao();
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* sem suporte: segue */ }
   estado.dados = ler(CHAVE_DADOS, null);
