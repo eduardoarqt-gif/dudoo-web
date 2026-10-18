@@ -1,6 +1,6 @@
 // Dudoo Web — service worker: guarda o app (shell) para abrir offline; os dados vêm da rede e caem no cache local do app.
-const VERSAO = "dudoo-web-v26";
-const ARQUIVOS = ["./", "index.html", "styles.css", "app.js", "demo.js", "mascaras.js", "cronograma.js", "cronograma.css", "manifest.webmanifest", "icon.svg", "icon-maskable.svg", "icon-180.png", "icon-192.png", "icon-512.png"];
+const VERSAO = "dudoo-web-v27";
+const ARQUIVOS = ["./", "index.html", "styles.css", "app.js", "quadro.js", "demo.js", "mascaras.js", "cronograma.js", "cronograma.css", "manifest.webmanifest", "icon.svg", "icon-maskable.svg", "icon-180.png", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(ARQUIVOS)).then(() => self.skipWaiting()));

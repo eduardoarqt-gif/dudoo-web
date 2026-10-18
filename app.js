@@ -52,6 +52,7 @@ async function carregar(forcar) {
     if (j.vazio || !j.hoje) throw new Error("O Dudoo ainda não publicou os dados. Abra o Dudoo no computador.");
     estado.dados = normalizarFinanceiro(j);
     gravar(CHAVE_DADOS, estado.dados);
+    if (typeof processarPlantasRecebidas === "function") processarPlantasRecebidas(j);          // prévias de planta pedidas pelo Quadro
     estado.ultimaAtualizacao = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   } catch (e) {
     estado.erroConexao = String(e.message || e);
@@ -172,7 +173,7 @@ async function liberarFinanceiro() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) estado.liberado = false; });
 
 // ---------------------------------------------------------------- telas
-const ABAS = [["hoje", "Hoje"], ["projetos", "Projetos"], ["ideias", "Marketing"], ["financeiro", "Financeiro"], ["mais", "Mais"]];
+const ABAS = [["hoje", "Hoje"], ["projetos", "Projetos"], ["ideias", "Marketing"], ["financeiro", "Financeiro"], ["ferramentas", "Ferramentas"]];
 
 function desenharAbas() {
   const n = estado.dados ? estado.dados.hoje.precisa.length : 0;
@@ -280,12 +281,12 @@ function abrirNota(id) {
     avisar("Nota guardada. O Dudoo grava e manda pro Simplenote quando estiver aberto.");
   });
 }
-function telaNotas() {
+function telaNotas(embutida) {
   const filtro = estado.filtroNotas;
   const d = estado.dados;
   const opcoes = [`<option value="__todas" ${filtro === "__todas" ? "selected" : ""}>Todas as notas</option>`, `<option value="" ${filtro === "" ? "selected" : ""}>Sem projeto</option>`]
     .concat(d.projetos.map((p) => `<option value="${esc(p.codigo)}" ${filtro === p.codigo ? "selected" : ""}>${esc(p.codigo)} ${esc(p.nome)}</option>`)).join("");
-  return `<button class="voltar" data-acao="voltar-hoje">‹ Hoje</button><h1>Notas</h1><div class="mini">Sincronizadas com o Simplenote · etiqueta = número do projeto</div>
+  return `${embutida ? "" : '<button class="voltar" data-acao="voltar-hoje">‹ Hoje</button><h1>Notas</h1>'}<div class="mini">Sincronizadas com o Simplenote · etiqueta = número do projeto</div>
     <select class="campo" id="nota-filtro">${opcoes}</select>${blocoNotas(filtro === "__todas" ? undefined : filtro)}`;
 }
 
@@ -405,9 +406,18 @@ function blocoConexao() {
     <button class="btn" data-acao="colar-link">Conectar</button>`;
 }
 
+// Ferramentas (18/10/2026): o mesmo menu do Dudoo do computador — Ferramentas → Geral · Notas · Quadro. Regra: toda tela do app segue o menu e a sub-aba do PC.
+const SUBS_FERRAMENTAS = [["geral", "Geral"], ["notas", "Notas"], ["quadro", "Quadro"]];
+function telaFerramentas() {
+  const sub = estado.subFerr || "geral";
+  const menu = `<div class="seg">${SUBS_FERRAMENTAS.map(([k, nome]) => `<button class="${sub === k ? "on" : ""}" data-sub-ferr="${k}">${nome}${k === "notas" && novasNotas() ? ` · ${novasNotas()}` : ""}</button>`).join("")}</div>`;
+  const corpo = sub === "notas" ? telaNotas(true) : sub === "quadro" ? (typeof telaQuadroLista === "function" ? telaQuadroLista() : "") : telaMais();
+  return `<h1>Ferramentas</h1>${menu}${corpo}`;
+}
+
 function telaMais() {
   const ponto = estado.dados.usuario.ponto === "dentro";
-  return `<h1>Mais</h1>
+  return `<h2 class="sec">Geral</h2>
     <h2 class="sec">Ponto</h2><div class="card"><div class="linha"><div class="t">${ponto ? "Você está com o ponto aberto" : "Ainda não bateu o ponto"}</div></div><button class="btn" data-acao="ponto">${ponto ? "Registrar saída" : "Registrar entrada"}</button></div>
     <h2 class="sec">Conexão com o Dudoo</h2><div class="card"><div class="p" style="margin:0 0 8px">${estado.demo ? "Modo demonstração (dados de exemplo)." : "Conectado" + (estado.ultimaAtualizacao ? " · atualizado às " + estado.ultimaAtualizacao : "")}${estado.erroConexao ? " · " + esc(estado.erroConexao) : ""}${pendentes() ? ` · ${pendentes()} ação(ões) aguardando envio` : ""}</div>
       ${blocoConexao()}</div>
@@ -423,7 +433,7 @@ function telaSemDados() {
 function desenhar() {
   if (!estado.dados) { $("#app").innerHTML = telaSemDados(); desenharAbas(); return; }
   if (!notasVistasEm()) marcarNotasVistas();             // 1ª vez: o que já existe não conta como "nova"
-  const telas = { hoje: telaHoje, projetos: telaProjetos, ideias: telaIdeias, financeiro: telaFinanceiro, mais: telaMais, notas: telaNotas, leads: telaLeads };
+  const telas = { hoje: telaHoje, projetos: telaProjetos, ideias: telaIdeias, financeiro: telaFinanceiro, ferramentas: telaFerramentas, mais: telaFerramentas, notas: telaFerramentas, leads: telaLeads };
   const y = window.scrollY;
   $("#app").innerHTML = telas[estado.aba]();
   desenharAbas();
@@ -743,7 +753,19 @@ document.addEventListener("click", async (e) => {
   const d = estado.dados;
   let el;
   if ((el = q("[data-aba]"))) { estado.aba = el.dataset.aba; estado.projeto = null; desenhar(); window.scrollTo(0, 0); if (estado.aba === "financeiro" && !estado.liberado) liberarFinanceiro(); return; }
-  if ((el = q("[data-aba-ir]"))) { estado.aba = el.dataset.abaIr; if (estado.aba === "notas") marcarNotasVistas(); desenhar(); window.scrollTo(0, 0); return; }
+  if ((el = q("[data-aba-ir]"))) {
+    estado.aba = el.dataset.abaIr;
+    if (estado.aba === "notas") { estado.aba = "ferramentas"; estado.subFerr = "notas"; marcarNotasVistas(); }
+    else if (estado.aba === "mais") { estado.aba = "ferramentas"; estado.subFerr = "geral"; }
+    desenhar(); window.scrollTo(0, 0); return;
+  }
+  if ((el = q("[data-sub-ferr]"))) { estado.subFerr = el.dataset.subFerr; if (estado.subFerr === "notas") marcarNotasVistas(); desenhar(); return; }
+  if ((el = q("[data-quadro-abrir]"))) { if (typeof abrirQuadro === "function") abrirQuadro(el.dataset.quadroAbrir); return; }
+  if ((el = q("[data-quadro-apagar]"))) {
+    const id = el.dataset.quadroApagar;
+    if (confirm("Apagar este desenho do iPhone? (O que já foi enviado ao Dudoo continua lá.)")) { gravarRascunhos(rascunhos().filter((x) => x.local_id !== id)); desenhar(); }
+    return;
+  }
   if ((el = q("[data-projeto]"))) { estado.projeto = el.dataset.projeto; estado.subProjeto = "resumo"; estado.subPortal = "entregas"; desenhar(); window.scrollTo(0, 0); return; }
   if ((el = q("[data-subprojeto]"))) { estado.subProjeto = el.dataset.subprojeto; desenhar(); return; }
   if ((el = q("[data-obra-item]"))) { abrirItemObra(el.dataset.obraItem); return; }
@@ -912,6 +934,10 @@ document.addEventListener("click", async (e) => {
         avisar("Lead enviado. O Dudoo cadastra quando estiver aberto.");
         setTimeout(() => oferecerPrimeiraMensagem(texto), 250);        // a folha atual fecha ao confirmar; a oferta abre logo depois
       });
+    } else if (a === "quadro-novo") {
+      const q = novoRascunho(); abrirQuadro(q.local_id);
+    } else if (a === "quadro-planta") {
+      escolherPlanta();
     } else if (a === "nova-tarefa") {
       const hoje = new Date().toISOString().slice(0, 10);
       const projetos = (d.projetos || []).filter((p) => p.estado === "ativo")
