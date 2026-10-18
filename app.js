@@ -104,6 +104,25 @@ function abrirFolha(titulo, camposHtml, rotulo, aoConfirmar) {
   document.getElementById("folha-ok").addEventListener("click", () => { if (aoConfirmar() !== false) fecharFolha(); });
 }
 
+// Copiar texto (18/10/2026, Eduardo: "botão pra copiar o texto" nas notas): clipboard do iOS/Chrome, com plano B (campo escondido) pra contexto sem permissão.
+async function copiarTexto(texto) {
+  const t = String(texto || "");
+  if (!t) { avisar("Nada pra copiar."); return; }
+  try {
+    await navigator.clipboard.writeText(t);
+    avisar("Texto copiado.");
+    return;
+  } catch (e) { /* cai no plano B */ }
+  try {
+    const campo = document.createElement("textarea");
+    campo.value = t; campo.setAttribute("readonly", ""); campo.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    document.body.appendChild(campo); campo.select(); campo.setSelectionRange(0, t.length);
+    const ok = document.execCommand("copy");
+    campo.remove();
+    avisar(ok ? "Texto copiado." : "Não consegui copiar: segure o texto e escolha Copiar.");
+  } catch (e) { avisar("Não consegui copiar: segure o texto e escolha Copiar."); }
+}
+
 function avisar(texto) {
   const a = $("#aviso"); a.textContent = texto; a.hidden = false;
   clearTimeout(avisar.t); avisar.t = setTimeout(() => { a.hidden = true; }, 3200);
@@ -238,7 +257,8 @@ function cartaoNota(n) {
   }
   const aviso = n.gerada ? "gerada pelo Dudoo (só leitura)" : n.longa ? "nota longa: edite no Dudoo" : "";
   return `<details class="card nota${n.pendente ? " pendente" : ""}"><summary><span class="t"><b>${esc(n.titulo)}</b><span class="p">${esc(quandoNota(n.atualizado))}${n.pendente ? " · aguardando o Dudoo" : ""}${aviso ? " · " + aviso : ""}</span></span>${projeto}</summary>
-    <div class="nota-texto">${esc(resto || "(sem mais texto)")}</div></details>`;
+    <div class="nota-texto">${esc(resto || "(sem mais texto)")}</div>
+    <button class="btn o peq" style="margin-top:10px" data-copiar-nota="${esc(n.id)}">Copiar texto</button></details>`;
 }
 function blocoNotas(codigo) {
   const d = estado.dados, lista = todasNotas().filter((n) => (codigo === undefined ? true : codigo === "" ? !n.projeto : n.projeto === codigo));
@@ -249,7 +269,7 @@ function blocoNotas(codigo) {
 function abrirNota(id) {
   const n = todasNotas().find((x) => x.id === id);
   if (!n) return;
-  abrirFolha("Editar nota", `<textarea class="campo" id="nota-ed" style="min-height:280px">${esc(n.texto)}</textarea><div class="mini">A 1ª linha é o título. Salvar edita esta nota (não cria outra).</div>`, "Salvar", () => {
+  abrirFolha("Editar nota", `<button class="btn o peq" style="margin-bottom:8px" data-copiar-nota="${esc(n.id)}">Copiar texto</button><textarea class="campo" id="nota-ed" style="min-height:280px">${esc(n.texto)}</textarea><div class="mini">A 1ª linha é o título. Salvar edita esta nota (não cria outra).</div>`, "Salvar", () => {
     const texto = ($("#nota-ed").value || "").trim();
     if (!texto) { avisar("A nota não pode ficar vazia."); return false; }
     if (texto === String(n.texto || "").trim()) { avisar("Nada mudou."); return false; }
@@ -706,6 +726,12 @@ document.addEventListener("click", async (e) => {
   if ((el = q("[data-projeto]"))) { estado.projeto = el.dataset.projeto; estado.subProjeto = "resumo"; estado.subPortal = "entregas"; desenhar(); window.scrollTo(0, 0); return; }
   if ((el = q("[data-subprojeto]"))) { estado.subProjeto = el.dataset.subprojeto; desenhar(); return; }
   if ((el = q("[data-obra-item]"))) { abrirItemObra(el.dataset.obraItem); return; }
+  if ((el = q("[data-copiar-nota]"))) {
+    const nota = todasNotas().find((x) => x.id === el.dataset.copiarNota);
+    const campo = $("#nota-ed");                                           // na folha de edição copia o que está no campo agora
+    copiarTexto(campo && el.closest("#folha") ? campo.value : String((nota && nota.texto) || ""));
+    return;
+  }
   if ((el = q("[data-nota-editar]"))) { abrirNota(el.dataset.notaEditar); return; }
   if ((el = q("[data-subportal]"))) { estado.subPortal = el.dataset.subportal; desenhar(); return; }
   if ((el = q("[data-fin]"))) { estado.fin = el.dataset.fin; desenhar(); return; }
