@@ -664,9 +664,9 @@ function abrirItemObra(itemId) {
   const opcoes = p.orcamento.situacoes.map((s) => `<option value="${esc(s)}" ${s === i.st ? "selected" : ""}>${esc(s)}</option>`).join("");
   const campos = `<div class="mini">${esc(i.nome)}${pend ? " · alteração aguardando o Dudoo" : ""}</div>
     <label class="rot">Situação</label><select class="campo" id="o-st">${opcoes}</select>
-    <label class="rot">Valor orçado (total, R$)</label><input class="campo" id="o-orc" inputmode="decimal" value="${i.orc ? String(i.orc).replace(".", ",") : ""}">
+    <label class="rot">Valor orçado (total, R$)</label><input class="campo" id="o-orc" inputmode="decimal" data-mascara="dinheiro" value="${i.orc ? String(i.orc).replace(".", ",") : ""}">
     <label class="rot">Quantidade</label><input class="campo" id="o-qtd" inputmode="decimal" value="${i.qtd != null ? String(i.qtd).replace(".", ",") : ""}">
-    <label class="rot">Valor contratado (total, R$) <span class="mini">— só ao marcar Contratado</span></label><input class="campo" id="o-contr" inputmode="decimal" value="${i.contr ? String(i.contr).replace(".", ",") : ""}">
+    <label class="rot">Valor contratado (total, R$) <span class="mini">— só ao marcar Contratado</span></label><input class="campo" id="o-contr" inputmode="decimal" data-mascara="dinheiro" value="${i.contr ? String(i.contr).replace(".", ",") : ""}">
     <label class="rot">Prazo de entrega</label><input class="campo" id="o-prazo" value="${esc(i.prazo || "")}" placeholder="Ex.: 30 dias úteis">
     <label class="rot">Fornecedor</label><input class="campo" id="o-forn" value="${esc(i.forn || "")}">
     <label class="rot">Motivo <span class="mini">— só ao marcar "Não comprar agora"</span></label><input class="campo" id="o-motivo">`;
@@ -742,7 +742,7 @@ document.addEventListener("click", async (e) => {
       <select class="campo" id="f-conta"><option value="">Não informar</option>${contas.map((n) => `<option>${esc(n)}</option>`).join("")}</select>
       <label class="rot">${receber ? "Data do recebimento" : "Data do pagamento"}</label><input class="campo" id="f-data" type="date" value="${hoje}">
       <label class="rot">${receber ? "Valor recebido (R$)" : "Valor pago (R$) — pode ser diferente do lançado"}</label>
-      <input class="campo" id="f-valor" inputmode="decimal" value="${esc(c.valor.toFixed(2).replace(".", ","))}">`;
+      <input class="campo" id="f-valor" inputmode="decimal" data-mascara="dinheiro" value="${esc(c.valor.toFixed(2).replace(".", ","))}">`;
     abrirFolha(`${receber ? (c.rt ? "Marcar recebida" : "Dar baixa") : "Marcar paga"} — ${c.descricao}`, campos, "Confirmar baixa", () => {
       const data = ($("#f-data").value || hoje), conta = $("#f-conta").value, valor = numeroBr($("#f-valor").value);
       if (!(valor > 0)) { avisar("Valor inválido."); return false; }
@@ -881,7 +881,7 @@ document.addEventListener("click", async (e) => {
       const projetos = (d.projetos || []).map((p) => `<option value="${esc(p.codigo)}" ${p.id === estado.projeto ? "selected" : ""}>${esc(p.codigo)} ${esc(p.nome)}</option>`).join("");
       const campos = `${pedeProjeto ? `<label class="rot">Projeto</label><select class="campo" id="n-projeto">${projetos}</select>` : ""}
         <label class="rot">Descrição</label><input class="campo" id="n-desc" placeholder="${receber ? "Ex.: Honorários — parcela 2" : "Ex.: Conta de luz"}">
-        <label class="rot">Valor (R$)</label><input class="campo" id="n-valor" inputmode="decimal" placeholder="0,00">
+        <label class="rot">Valor (R$)</label><input class="campo" id="n-valor" inputmode="decimal" data-mascara="dinheiro" placeholder="0,00">
         <label class="rot">Vencimento</label><input class="campo" id="n-venc" type="date" value="${hoje}">`;
       abrirFolha(`${receber ? "Nova conta a receber" : "Nova conta a pagar"} · ${escopo === "pessoal" ? "Pessoal" : "Escritório"}`, campos, "Criar", () => {
         const descricao = ($("#n-desc").value || "").trim(), valor = numeroBr($("#n-valor").value), venc = $("#n-venc").value;
