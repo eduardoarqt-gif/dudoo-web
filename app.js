@@ -12,7 +12,7 @@ const brl = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", c
 const dataBr = (iso) => { const [a, m, d] = String(iso || "").split("-"); return d ? `${d}/${m}` : ""; };
 
 const estado = {
-  aba: "hoje", projeto: null, subProjeto: "resumo", subPortal: "entregas", fin: "escritorio", finSub: "receber",
+  aba: "hoje", projeto: null, arquivado: null, arquivadosAbertos: false, subProjeto: "resumo", subPortal: "entregas", fin: "escritorio", finSub: "receber",
   filtroNotas: "__todas", dados: null, demo: true, fila: ler(CHAVE_FILA, []), liberado: false, liberadoEm: 0, ultimaAtualizacao: "", mes: "", erroConexao: "",
 };
 
@@ -250,11 +250,35 @@ function telaProjetos() {
     return `<button class="voltar" data-acao="voltar">‹ Projetos</button><h1>${esc(p.codigo)} ${esc(p.nome)}</h1><div class="mini">${esc(p.sub)}</div>
       <div class="seg">${abas.map(([k, n]) => `<button data-subprojeto="${k}" class="${estado.subProjeto === k ? "on" : ""}">${n}</button>`).join("")}</div>${corpo}`;
   }
+  if (estado.arquivado) {
+    const a = (d.arquivados || []).find((x) => x.id === estado.arquivado);
+    if (!a) { estado.arquivado = null; return telaProjetos(); }
+    return `<button class="voltar" data-acao="voltar-arquivado">‹ Projetos</button><h1>${esc(a.codigo)} ${esc(a.nome)}</h1><div class="mini">Projeto arquivado</div>
+      <div class="card"><div class="linha"><div class="t">Ano</div><span class="val dir">${esc(a.ano || "—")}</span></div><div class="linha"><div class="t">Tipo</div><span class="val dir">${esc(a.tipo || "—")}</span></div>${a.fim ? `<div class="linha"><div class="t">Finalizado em</div><span class="val dir">${esc(a.fim.slice(5, 7))}/${esc(a.fim.slice(0, 4))}</span></div>` : ""}</div>
+      <div class="mini">Para ver tarefas, orçamento ou arquivos, abra o projeto no Dudoo do computador.</div>`;
+  }
   const ativos = d.projetos.filter((p) => p.estado === "ativo"), outros = d.projetos.filter((p) => p.estado !== "ativo");
   const card = (p) => `<div class="card toque" data-projeto="${esc(p.id)}"><div class="linha"><div class="t"><b>${esc(p.codigo)} ${esc(p.nome)}</b><div class="p">${esc(p.sub)}</div></div><span class="pill ${p.estado === "ativo" ? "v" : "a"} dir">${p.estado === "ativo" ? "ATIVO" : "PAUSADO"}</span></div>
     <div class="barra"><i style="width:${p.pct}%"></i></div><div class="p">${p.pct}% · ${p.tarefas.filter((t) => !t.feita).length} tarefas abertas · <span style="color:${p.atrasado ? "var(--verm)" : "inherit"}">${esc(p.prazo)}</span></div></div>`;
-  return `<h1>Projetos</h1><div class="mini">${ativos.length} ativos</div><h2 class="sec">Ativos</h2>${ativos.map(card).join("")}${outros.length ? `<h2 class="sec">Pausados</h2>${outros.map(card).join("")}` : ""}`;
+  const arq = d.arquivados || [];
+  const bloco = arq.length ? `<h2 class="sec">Arquivados</h2><button class="btn o atalho" data-acao="arquivados">${estado.arquivadosAbertos ? "Esconder" : "Ver"} arquivados (${arq.length})</button>` +
+    (estado.arquivadosAbertos ? `<input class="campo" id="busca-arquivados" type="search" placeholder="Buscar por nome ou código…" autocomplete="off"><div id="lista-arquivados">${listaArquivados(arq, "")}</div>` : "") : "";
+  return `<h1>Projetos</h1><div class="mini">${ativos.length} ativos</div><h2 class="sec">Ativos</h2>${ativos.map(card).join("")}${outros.length ? `<h2 class="sec">Pausados</h2>${outros.map(card).join("")}` : ""}${bloco}`;
 }
+
+// Arquivados (22/10/2026): só resumo; a lista é filtrada na hora, sem redesenhar a tela (não perde o foco da busca).
+const semAcento = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+function listaArquivados(arq, termo) {
+  const t = semAcento(termo).trim();
+  const lista = t ? arq.filter((a) => semAcento(`${a.codigo} ${a.nome}`).includes(t)) : arq;
+  return lista.map((a) => `<div class="card toque" data-arquivado="${esc(a.id)}"><div class="linha"><div class="t"><b>${esc(a.codigo)} ${esc(a.nome)}</b><div class="p">${esc(a.ano)}${a.tipo ? " · " + esc(a.tipo) : ""}</div></div><span class="pill a dir">ARQUIVADO</span></div></div>`).join("") || '<div class="vazio">Nenhum arquivado com esse nome.</div>';
+}
+document.addEventListener("input", (e) => {
+  if (e.target && e.target.id === "busca-arquivados") {
+    const alvo = document.getElementById("lista-arquivados");
+    if (alvo && estado.dados) alvo.innerHTML = listaArquivados(estado.dados.arquivados || [], e.target.value);
+  }
+});
 
 // ---------------------------------------------------------------- notas (ligadas ao projeto pela etiqueta = número do projeto)
 const todasNotas = () => (estado.dados && estado.dados.notas) || [];
@@ -786,6 +810,7 @@ document.addEventListener("click", async (e) => {
     if (confirm("Apagar este desenho do iPhone? (O que já foi enviado ao Dudoo continua lá.)")) { gravarRascunhos(rascunhos().filter((x) => x.local_id !== id)); desenhar(); }
     return;
   }
+  if ((el = q("[data-arquivado]"))) { estado.arquivado = el.dataset.arquivado; desenhar(); window.scrollTo(0, 0); return; }
   if ((el = q("[data-projeto]"))) { estado.projeto = el.dataset.projeto; estado.subProjeto = "resumo"; estado.subPortal = "entregas"; desenhar(); window.scrollTo(0, 0); return; }
   if ((el = q("[data-subprojeto]"))) { estado.subProjeto = el.dataset.subprojeto; desenhar(); return; }
   if ((el = q("[data-obra-item]"))) { abrirItemObra(el.dataset.obraItem); return; }
@@ -904,6 +929,8 @@ document.addEventListener("click", async (e) => {
     const a = el.dataset.acao;
     if (a === "atualizar") { await carregar(true); await enviarFila(); desenhar(); avisar(estado.demo ? "Modo demonstração." : "Atualizado."); }
     else if (a === "voltar") { estado.projeto = null; desenhar(); }
+    else if (a === "voltar-arquivado") { estado.arquivado = null; desenhar(); }
+    else if (a === "arquivados") { estado.arquivadosAbertos = !estado.arquivadosAbertos; desenhar(); }
     else if (a === "voltar-hoje") { estado.aba = "hoje"; desenhar(); }
     else if (a === "nova-nota") {
       const fixo = el.dataset.codNota || "";
