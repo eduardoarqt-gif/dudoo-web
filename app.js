@@ -266,6 +266,13 @@ function telaProjetos() {
   return `<h1>Projetos</h1><div class="mini">${ativos.length} ativos</div><h2 class="sec">Ativos</h2>${ativos.map(card).join("")}${outros.length ? `<h2 class="sec">Pausados</h2>${outros.map(card).join("")}` : ""}${bloco}`;
 }
 
+// Soma meses a uma data AAAA-MM-DD mantendo o dia (31 vira o último dia do mês curto) — igual ao Dudoo do PC.
+function somarMeses(iso, n) {
+  const [a, m, di] = iso.split("-").map(Number);
+  const alvo = new Date(a, m - 1 + n, 1), ultimo = new Date(alvo.getFullYear(), alvo.getMonth() + 1, 0).getDate();
+  return `${alvo.getFullYear()}-${String(alvo.getMonth() + 1).padStart(2, "0")}-${String(Math.min(di, ultimo)).padStart(2, "0")}`;
+}
+
 // Arquivados (22/10/2026): só resumo; a lista é filtrada na hora, sem redesenhar a tela (não perde o foco da busca).
 const semAcento = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 function listaArquivados(arq, termo) {
@@ -1044,19 +1051,27 @@ document.addEventListener("click", async (e) => {
       const campos = `${pedeProjeto ? `<label class="rot">Projeto</label><select class="campo" id="n-projeto">${projetos}</select>` : ""}
         <label class="rot">Descrição</label><input class="campo" id="n-desc" placeholder="${receber ? "Ex.: Honorários — parcela 2" : "Ex.: Conta de luz"}">
         <label class="rot">Valor (R$)</label><input class="campo" id="n-valor" inputmode="decimal" data-mascara="dinheiro" placeholder="0,00">
-        <label class="rot">Vencimento</label><input class="campo" id="n-venc" type="date" value="${hoje}">`;
+        <label class="rot">Vencimento${receber ? "" : " (da 1ª parcela)"}</label><input class="campo" id="n-venc" type="date" value="${hoje}">
+        ${receber ? "" : `<label class="rot">Parcelas (1 = à vista)</label><input class="campo" id="n-parcelas" type="number" inputmode="numeric" min="1" max="60" value="1">
+        <div class="mini">O valor acima é o de CADA parcela. As outras vencem no mesmo dia dos meses seguintes.</div>
+        ${escopo === "pessoal" ? `<label class="rot">Débito automático em conta</label><select class="campo" id="n-banco"><option value="">Não tem</option>${(d.financeiro.contas || []).map((c) => `<option>${esc(c)}</option>`).join("")}</select>` : ""}`}`;
       abrirFolha(`${receber ? "Nova conta a receber" : "Nova conta a pagar"} · ${escopo === "pessoal" ? "Pessoal" : "Escritório"}`, campos, "Criar", () => {
         const descricao = ($("#n-desc").value || "").trim(), valor = numeroBr($("#n-valor").value), venc = $("#n-venc").value;
         const projeto = pedeProjeto ? ($("#n-projeto").value || "") : "";
         if (!descricao) { avisar("Escreva a descrição."); return false; }
         if (!(valor > 0)) { avisar("Valor inválido."); return false; }
         if (!venc) { avisar("Escolha o vencimento."); return false; }
+        const parcelas = receber ? 1 : Math.max(1, Math.min(60, parseInt(($("#n-parcelas") || {}).value, 10) || 1));
+        const banco = !receber && $("#n-banco") ? $("#n-banco").value : "";
         const nova = { id: "novo-" + Date.now(), descricao, valor, venc, status: venc < hoje ? "vencida" : "aberta", projeto };
-        comando(receber ? "criar_conta_receber" : "criar_conta_pagar", { descricao, valor, vencimento: venc, projeto, escopo, local_id: nova.id }, () => {
-          const pm = d.financeiro[escopo].por_mes[venc.slice(0, 7)];
-          if (pm) (receber ? pm.a_receber : pm.a_pagar).unshift(nova);
+        comando(receber ? "criar_conta_receber" : "criar_conta_pagar", { descricao, valor, vencimento: venc, projeto, escopo, local_id: nova.id, parcelas, banco_debito: banco }, () => {
+          for (let i = 0; i < parcelas; i++) {
+            const dia = somarMeses(venc, i), pm = d.financeiro[escopo].por_mes[dia.slice(0, 7)];
+            const item = parcelas > 1 ? { ...nova, id: `${nova.id}-${i + 1}`, descricao: `${descricao} (Parcela ${i + 1}/${parcelas})`, venc: dia, status: dia < hoje ? "vencida" : "aberta" } : nova;
+            if (pm) (receber ? pm.a_receber : pm.a_pagar).unshift(item);
+          }
         });
-        avisar("Conta criada. O Dudoo grava assim que estiver aberto.");
+        avisar(parcelas > 1 ? `Conta criada em ${parcelas} parcelas. O Dudoo grava assim que estiver aberto.` : "Conta criada. O Dudoo grava assim que estiver aberto.");
       });
     } else if (a === "colar-link") {
       const texto = (($("#cfg-link") || {}).value || "").trim();
