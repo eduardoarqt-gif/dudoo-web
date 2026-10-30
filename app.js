@@ -457,12 +457,14 @@ function blocoConexao() {
 }
 
 // Ferramentas (18/10/2026): o mesmo menu do Dudoo do computador — Ferramentas → Geral · Notas · Quadro. Regra: toda tela do app segue o menu e a sub-aba do PC.
-const SUBS_FERRAMENTAS = [["geral", "Geral"], ["notas", "Notas"], ["quadro", "Quadro"]];
+const SUBS_FERRAMENTAS = [["geral", "Geral"], ["notas", "Notas"], ["quadro", "Quadro"], ["revisar", "Revisar PDF"]];
 function telaFerramentas() {
   const sub = estado.subFerr || "geral";
   const menu = `<div class="seg">${SUBS_FERRAMENTAS.map(([k, nome]) => `<button class="${sub === k ? "on" : ""}" data-sub-ferr="${k}">${nome}${k === "notas" && novasNotas() ? ` · ${novasNotas()}` : ""}</button>`).join("")}</div>`;
   if (sub === "quadro" && typeof telaQuadroLista !== "function") garantirQuadroJs();
-  const corpo = sub === "notas" ? telaNotas(true) : sub === "quadro" ? (typeof telaQuadroLista === "function" ? telaQuadroLista() : '<div class="vazio">Carregando o Quadro…</div>') : telaMais();
+  if (sub === "revisar" && typeof telaRevisar !== "function") garantirRevisaoJs();
+  const corpo = sub === "notas" ? telaNotas(true) : sub === "quadro" ? (typeof telaQuadroLista === "function" ? telaQuadroLista() : '<div class="vazio">Carregando o Quadro…</div>')
+    : sub === "revisar" ? (typeof telaRevisar === "function" ? telaRevisar() : '<div class="vazio">Carregando o Revisar PDF…</div>') : telaMais();
   return `<h1>Ferramentas</h1>${menu}${corpo}`;
 }
 
@@ -1148,6 +1150,15 @@ function garantirQuadroJs() {
   s.src = "quadro.js?v=28"; s.dataset.quadroJs = "1";
   s.onload = () => { if (estado.dados && estado.aba === "ferramentas") desenhar(); };
   s.onerror = () => { document.querySelectorAll(".vazio").forEach((v) => { if (/Carregando o Quadro/.test(v.textContent)) v.textContent = "Não consegui carregar o Quadro (sem conexão?). Feche e abra o app de novo."; }); };
+  document.body.appendChild(s);
+}
+
+// Revisar PDF (revisao.js): carregado daqui se o index.html em cache for de antes dele existir.
+function garantirRevisaoJs() {
+  if (typeof telaRevisar === "function" || document.querySelector('script[data-revisao-js]')) return;
+  const s = document.createElement("script");
+  s.src = "revisao.js?v=1"; s.dataset.revisaoJs = "1";
+  s.onload = () => { if (estado.dados && estado.aba === "ferramentas") desenhar(); };
   document.body.appendChild(s);
 }
 

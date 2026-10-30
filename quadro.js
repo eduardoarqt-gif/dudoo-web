@@ -86,7 +86,7 @@ const estadoQuadro = { aberto: null, pagina: 0, ferramenta: "lapis", cor: CORES_
 
 // ---------------------------------------------------------------- lista (Ferramentas → Quadro)
 function telaQuadroLista() {
-  const lista = rascunhos(), doDudoo = (estado.dados && estado.dados.quadros) || [];
+  const lista = rascunhos().filter((x) => x.tipo !== "pdf"), doDudoo = (estado.dados && estado.dados.quadros) || [];      // revisões de PDF ficam em Ferramentas → Revisar PDF
   const cartao = (q) => `<div class="card toque" data-quadro-abrir="${esc(q.local_id)}"><div class="linha"><div class="t"><b>${esc(q.titulo || "Quadro")}</b>
       <div class="p">${q.paginas.length} página(s)${q.projeto ? " · " + esc(q.projeto) : ""} · ${q.pendente ? "ainda não enviado" : "enviado ao Dudoo"}</div></div>
       <button class="btn o peq" data-quadro-apagar="${esc(q.local_id)}">Apagar</button></div></div>`;
@@ -162,7 +162,8 @@ function fecharQuadro(salvar) {
 }
 
 const paginaAtual = () => estadoQuadro.aberto.paginas[estadoQuadro.pagina];
-const dimensoesQuadro = () => FORMATOS_QUADRO[estadoQuadro.aberto.formato] || FORMATOS_QUADRO.paisagem;
+// Página de PDF (Revisar PDF, 30/10/2026): cada página tem a própria medida lógica (proporção do PDF).
+const dimensoesQuadro = () => { const pg = estadoQuadro.aberto.paginas[estadoQuadro.pagina]; return (pg && pg.dim) || FORMATOS_QUADRO[estadoQuadro.aberto.formato] || FORMATOS_QUADRO.paisagem; };
 
 function salvarRascunho(marcarPendente) {
   const q = estadoQuadro.aberto; if (!q) return;
@@ -402,9 +403,9 @@ function desenharBarra() {
     <button class="qd-b" data-qd-acao="desfazer" aria-label="Desfazer">↶</button><button class="qd-b" data-qd-acao="refazer" aria-label="Refazer">↷</button>
     <button class="qd-b" data-qd-acao="ajustar" aria-label="Ajustar à tela">⤢</button><hr>
     <div class="qd-pag"><button class="qd-b" data-qd-acao="pag-menos">‹</button><span>${eq.pagina + 1}/${n}</span><button class="qd-b" data-qd-acao="pag-mais">›</button></div>
-    <button class="qd-b" data-qd-acao="pag-nova" aria-label="Nova página">＋</button>
+    ${eq.aberto.tipo === "pdf" ? "" : '<button class="qd-b" data-qd-acao="pag-nova" aria-label="Nova página">＋</button>'}
     <button class="qd-b${eq.soPencil ? " on" : ""}" data-qd-acao="so-pencil" aria-label="Só Apple Pencil" title="Só Apple Pencil">🖊</button><hr>
-    <button class="qd-b ok" data-qd-acao="enviar" aria-label="Salvar e enviar ao Dudoo">✓</button><button class="qd-b" data-qd-acao="sair" aria-label="Fechar">✕</button>`;
+    <button class="qd-b ok" data-qd-acao="enviar" aria-label="${eq.aberto.tipo === "pdf" ? "Salvar como A revisar" : "Salvar e enviar ao Dudoo"}">✓</button><button class="qd-b" data-qd-acao="sair" aria-label="Fechar">✕</button>`;
 }
 function avisoQuadro(texto, ms) {
   const a = $("#qd-aviso"); if (!a) return;
@@ -427,13 +428,14 @@ document.addEventListener("click", (e) => {
   else if (acao === "pag-mais" && eq.pagina < eq.aberto.paginas.length - 1) { mudarPagina(eq.pagina + 1); }
   else if (acao === "pag-nova") { eq.aberto.paginas.push({ itens: [], fundo_planta: null }); salvarRascunho(true); mudarPagina(eq.aberto.paginas.length - 1); }
   else if (acao === "so-pencil") { eq.soPencil = !eq.soPencil; gravar(CHAVE_SO_PENCIL, eq.soPencil); desenharBarra(); avisoQuadro(eq.soPencil ? "Só o Apple Pencil desenha (dedo só move e amplia)." : "Dedo e Pencil desenham.", 2200); }
-  else if (acao === "enviar") { enviarQuadro(); }
+  else if (acao === "enviar") { if (eq.aberto.tipo === "pdf" && typeof salvarRevisaoPdf === "function") salvarRevisaoPdf(); else enviarQuadro(); }
   else if (acao === "sair") { fecharQuadro(true); }
 });
 
 function mudarPagina(i) {
   const eq = estadoQuadro;
   eq.pagina = i; eq.historico = []; eq.refazer = [];
+  if (paginaAtual().dim) ajustarVista();                                    // PDF: cada página tem sua proporção
   carregarFundoDaPagina();
   desenharBarra(); pintarQuadro();
 }
@@ -443,6 +445,7 @@ async function carregarFundoDaPagina() {
   const eq = estadoQuadro, i = eq.pagina, pg = paginaAtual();
   delete eq.imagensFundo[i];
   clearInterval(eq.relogio); eq.esperando = null;
+  if (pg.fundo_pdf !== undefined && typeof carregarFundoPdf === "function") { pintarQuadro(); carregarFundoPdf(i, pg); return; }          // PDF renderizado de fundo (revisao.js)
   if (!pg.fundo_planta) { pintarQuadro(); return; }
   const chave = `${pg.fundo_planta.projeto}|${pg.fundo_planta.pavimento}`;
   let url = await lerPlanta(chave);
