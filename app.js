@@ -229,7 +229,7 @@ function telaProjetos() {
   if (estado.projeto) {
     const p = d.projetos.find((x) => x.id === estado.projeto);
     if (!p) { estado.projeto = null; return telaProjetos(); }
-    const abas = [["resumo", "Resumo"], ["tarefas", "Tarefas"], ["cronograma", "Cronograma"], ["orcamento", "Orçamento"], ["notas", "Notas"], ["portal", "Portal"]];
+    const abas = [["resumo", "Resumo"], ["tarefas", "Tarefas"], ["cronograma", "Cronograma"], ["orcamento", "Orçamento"], ["revisar", "Revisar PDF"], ["notas", "Notas"], ["portal", "Portal"]];
     let corpo = "";
     if (estado.subProjeto === "resumo") {
       corpo = `<h2 class="sec">Andamento</h2><div class="card">${p.frentes.map((f) => `<div class="linha" style="margin-bottom:10px"><div class="t">${esc(f.nome)}<div class="barra"><i style="width:${f.pct}%"></i></div></div><span class="val dir">${f.pct}%</span></div>`).join("")}</div>
@@ -242,6 +242,9 @@ function telaProjetos() {
       corpo = corpoCronograma(p);
     } else if (estado.subProjeto === "orcamento") {
       corpo = corpoObra(p);
+    } else if (estado.subProjeto === "revisar") {
+      if (typeof telaRevisar !== "function") garantirRevisaoJs();
+      corpo = typeof telaRevisar === "function" ? telaRevisar(p.codigo) : '<div class="vazio">Carregando o Revisar PDF…</div>';          // anotar PDFs do projeto (revisao.js)
     } else if (estado.subProjeto === "notas") {
       corpo = blocoNotas(p.codigo);
     } else {
@@ -457,14 +460,12 @@ function blocoConexao() {
 }
 
 // Ferramentas (18/10/2026): o mesmo menu do Dudoo do computador — Ferramentas → Geral · Notas · Quadro. Regra: toda tela do app segue o menu e a sub-aba do PC.
-const SUBS_FERRAMENTAS = [["geral", "Geral"], ["notas", "Notas"], ["quadro", "Quadro"], ["revisar", "Revisar PDF"]];
+const SUBS_FERRAMENTAS = [["geral", "Geral"], ["notas", "Notas"], ["quadro", "Quadro"]];
 function telaFerramentas() {
   const sub = estado.subFerr || "geral";
   const menu = `<div class="seg">${SUBS_FERRAMENTAS.map(([k, nome]) => `<button class="${sub === k ? "on" : ""}" data-sub-ferr="${k}">${nome}${k === "notas" && novasNotas() ? ` · ${novasNotas()}` : ""}</button>`).join("")}</div>`;
   if (sub === "quadro" && typeof telaQuadroLista !== "function") garantirQuadroJs();
-  if (sub === "revisar" && typeof telaRevisar !== "function") garantirRevisaoJs();
-  const corpo = sub === "notas" ? telaNotas(true) : sub === "quadro" ? (typeof telaQuadroLista === "function" ? telaQuadroLista() : '<div class="vazio">Carregando o Quadro…</div>')
-    : sub === "revisar" ? (typeof telaRevisar === "function" ? telaRevisar() : '<div class="vazio">Carregando o Revisar PDF…</div>') : telaMais();
+  const corpo = sub === "notas" ? telaNotas(true) : sub === "quadro" ? (typeof telaQuadroLista === "function" ? telaQuadroLista() : '<div class="vazio">Carregando o Quadro…</div>') : telaMais();
   return `<h1>Ferramentas</h1>${menu}${corpo}`;
 }
 
@@ -1157,8 +1158,8 @@ function garantirQuadroJs() {
 function garantirRevisaoJs() {
   if (typeof telaRevisar === "function" || document.querySelector('script[data-revisao-js]')) return;
   const s = document.createElement("script");
-  s.src = "revisao.js?v=1"; s.dataset.revisaoJs = "1";
-  s.onload = () => { if (estado.dados && estado.aba === "ferramentas") desenhar(); };
+  s.src = "revisao.js?v=2"; s.dataset.revisaoJs = "1";
+  s.onload = () => { if (estado.dados) desenhar(); };
   document.body.appendChild(s);
 }
 

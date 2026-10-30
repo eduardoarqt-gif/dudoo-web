@@ -1,4 +1,4 @@
-/* Dudoo Web — Revisar PDF (Ferramentas → Revisar PDF). 30/10/2026, Eduardo: corrigir projetos no iPad — abrir o último PDF gerado pelo Dudoo (ou um arquivo)
+/* Dudoo Web — Revisar PDF (Projetos → o projeto → Revisar PDF). 30/10/2026, Eduardo: corrigir projetos no iPad — abrir o último PDF gerado pelo Dudoo (ou um arquivo)
    e anotar/desenhar por cima com o Apple Pencil; o resultado volta pro Dropbox do projeto, em PROJETO/PDF/A revisar, como "<nome> - A REVISAR.pdf".
    Reaproveita o motor de desenho do Quadro (quadro.js): cada página do PDF é uma página do Quadro com o PDF renderizado de fundo (PDF.js) e os traços em
    vetor por cima. Ao salvar, o iPad cola os traços no PDF original (pdf-lib), sem passar pelo Wix — o arquivo vai direto pro Dropbox (API, autorização
@@ -130,23 +130,25 @@ const rvDados = () => (estado.dados && estado.dados.revisao_pdf) || {};
 const rvRascunhosPdf = () => rascunhos().filter((q) => q.tipo === "pdf");
 function rvDataHora(iso) { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
 
-function telaRevisar() {
-  const d = rvDados(), pdfs = d.pdfs || [], meus = rvRascunhosPdf();
+function telaRevisar(codigo) {
+  // Dentro do projeto (30/10/2026, Eduardo: "deveria ficar dentro do projeto"): só os PDFs e as revisões DESTE projeto; o arquivo adicionado já vai pra ele.
+  const d = rvDados(), todos = d.pdfs || [], pdfs = todos.map((p, i) => Object.assign({ i }, p)).filter((p) => !codigo || p.projeto === codigo),
+    meus = rvRascunhosPdf().filter((q) => !codigo || q.projeto === codigo);
   const conexao = !d.app_key ? `<div class="vazio">O Dudoo do computador ainda não mandou a chave do Dropbox. Abra o Dudoo e atualize.</div>`
     : rvConectado() ? `<div class="card"><div class="linha"><div class="t"><b>Dropbox conectado</b><div class="p">Os PDFs são baixados e o resultado volta pra pasta A revisar do projeto.</div></div>
         <button class="btn o peq" data-rv-acao="reconectar">Reconectar</button></div></div>`
     : `<div class="card"><div class="t"><b>Conectar o Dropbox</b><div class="p">Uma vez só: libera baixar o PDF e guardar o revisado.</div></div><button class="btn" data-rv-acao="conectar" style="margin-top:8px">Conectar o Dropbox</button></div>`;
-  const cartaoPdf = (p, i) => `<div class="card toque" data-rv-pdf="${i}"><div class="linha"><div class="t"><b>${esc(p.nome)}</b>
-      <div class="p">${esc(p.projeto)} · ${esc(rvDataHora(p.em))} · ${Math.round(p.kb / 1024 * 10) / 10 > 1 ? (p.kb / 1024).toFixed(1) + " MB" : p.kb + " KB"}</div></div>
+  const cartaoPdf = (p) => `<div class="card toque" data-rv-pdf="${p.i}"><div class="linha"><div class="t"><b>${esc(p.nome)}</b>
+      <div class="p">${esc(rvDataHora(p.em))} · ${Math.round(p.kb / 1024 * 10) / 10 > 1 ? (p.kb / 1024).toFixed(1) + " MB" : p.kb + " KB"}</div></div>
       <button class="btn peq">${estadoRevisao.baixando === p.path ? "Baixando…" : "Abrir"}</button></div></div>`;
   const cartaoMeu = (q) => `<div class="card toque" data-rv-abrir="${esc(q.local_id)}"><div class="linha"><div class="t"><b>${esc(q.titulo)}</b>
       <div class="p">${q.paginas.filter((p) => p.itens.length).length} de ${q.paginas.length} página(s) anotada(s)${q.projeto ? " · " + esc(q.projeto) : ""} · ${q.enviado_em ? "salvo no Dropbox " + esc(rvDataHora(q.enviado_em)) : "ainda não salvo"}</div></div>
       <button class="btn o peq" data-rv-apagar="${esc(q.local_id)}">Apagar</button></div></div>`;
   return `<h2 class="sec" style="margin-top:14px">Revisar PDF</h2>${conexao}
     <div class="linha" style="gap:8px;margin-top:8px"><label class="btn o" style="flex:1;text-align:center">+ Adicionar arquivo<input type="file" id="rv-arquivo" accept="application/pdf,.pdf" hidden></label></div>
-    <h2 class="sec">PDFs recentes do Dudoo · ${pdfs.length}</h2>${pdfs.map(cartaoPdf).join("") || '<div class="vazio">Nenhum PDF recente. Gere um no Dudoo (relações, demonstrativo…) e atualize.</div>'}
+    <h2 class="sec">PDFs recentes do Dudoo neste projeto · ${pdfs.length}</h2>${pdfs.map(cartaoPdf).join("") || '<div class="vazio">Nenhum PDF recente deste projeto. Gere um no Dudoo (relações, demonstrativo…) e atualize, ou adicione um arquivo.</div>'}
     <h2 class="sec">Revisões neste iPad · ${meus.length}</h2>${meus.map(cartaoMeu).join("") || '<div class="vazio">Nenhuma revisão em andamento.</div>'}
-    <div class="mini" style="margin-top:6px">Anote com o Apple Pencil (toque no ✎ pra ver as ferramentas) e toque em ✓ pra guardar em PROJETO/PDF/A revisar do projeto.</div>`;
+    <div class="mini" style="margin-top:6px">Anote com o Apple Pencil (toque no ✎ pra ver as ferramentas) e toque em ✓ pra guardar em PROJETO/PDF/A revisar do projeto (no Dudoo: Documentos → A revisar).</div>`;
 }
 
 document.addEventListener("click", async (e) => {
@@ -163,7 +165,7 @@ document.addEventListener("click", async (e) => {
   if ((el = q("[data-rv-pdf]"))) { rvAbrirRecente((rvDados().pdfs || [])[+el.dataset.rvPdf]); return; }
 }, true);
 document.addEventListener("change", (e) => {
-  if (e.target && e.target.id === "rv-arquivo" && e.target.files && e.target.files[0]) { const f = e.target.files[0]; e.target.value = ""; rvEscolherProjeto(f); }
+  if (e.target && e.target.id === "rv-arquivo" && e.target.files && e.target.files[0]) { const f = e.target.files[0]; e.target.value = ""; rvAbrirArquivo(f); }
 });
 
 // ---------------------------------------------------------------- abrir um PDF
@@ -183,6 +185,13 @@ async function rvAbrirRecente(p) {
     await rvCriarRevisao(bytes, { nome: p.nome, caminho: p.path, projetoPasta: proj ? proj.pasta : "", projeto: p.projeto });
   } catch (e) { avisar(e.message || String(e)); }
   estadoRevisao.baixando = ""; desenhar();
+}
+// Arquivo escolhido: dentro de um projeto já vai pra ele; sem projeto na tela, pergunta qual.
+function rvAbrirArquivo(arquivo) {
+  const atual = estado.dados && estado.projeto && (estado.dados.projetos || []).find((x) => x.id === estado.projeto);
+  const proj = atual && (rvDados().projetos || []).find((p) => p.codigo === atual.codigo);
+  if (!proj) { rvEscolherProjeto(arquivo); return; }
+  rvLerArquivo(arquivo).then((bytes) => rvCriarRevisao(bytes, { nome: arquivo.name, caminho: "", projetoPasta: proj.pasta, projeto: proj.codigo })).catch((e) => avisar(e.message || String(e)));
 }
 function rvEscolherProjeto(arquivo) {
   const projetos = rvDados().projetos || [];
