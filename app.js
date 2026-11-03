@@ -543,7 +543,8 @@ function cartaoLeque(i, n) {
       <button class="btn o peq" data-ideia-acao="executado" data-ideia="${esc(i.id)}">Executado</button>
       <button class="btn o peq" data-ideia-acao="adiar" data-ideia="${esc(i.id)}">Adiar</button>
       <button class="btn o peq" data-ideia-acao="descartar" data-ideia="${esc(i.id)}">Descartar</button>
-      <button class="btn o peq" data-ideia-acao="imagem" data-ideia="${esc(i.id)}">+ Imagem</button>`}</div></div>`;
+      <button class="btn o peq" data-ideia-acao="imagem" data-ideia="${esc(i.id)}">+ Imagem</button>`}${(i.midias || []).length ? `
+      <button class="btn o peq" data-ideia-acao="baixar" data-ideia="${esc(i.id)}">Baixar · ${i.midias.length}</button>` : ""}</div></div>`;
 }
 
 const ROTULO_TIPO_POST = { feed: "Feed", stories: "Stories", reels: "Reels" };
@@ -682,7 +683,26 @@ function comprimirImagem(arquivo) {
   });
 }
 
+// Baixar as fotos/vídeo do card pra postar do celular (03/11/2026): tenta o menu Compartilhar do iOS (Salvar imagem/vídeo, Instagram direto);
+// se o navegador não deixar (CORS), abre o link direto do Dropbox, onde dá pra segurar a imagem e salvar.
+async function baixarMidia(url, nome) {
+  try {
+    const arquivo = new File([await (await fetch(url)).blob()], nome);
+    if (navigator.canShare && navigator.canShare({ files: [arquivo] })) { await navigator.share({ files: [arquivo] }); return; }
+  } catch (erro) { if (erro && erro.name === "AbortError") return; }
+  window.open(url, "_blank", "noopener");
+}
+
+function abrirMidias(id) {
+  const c = conteudo(), i = c.semana.concat(c.ideias).find((x) => x.id === id), m = (i && i.midias) || [];
+  if (!m.length) { avisar("Este card não tem mídia pra baixar."); return; }
+  let fotos = 0;
+  const botoes = m.map((x, n) => `<button class="btn o" data-baixar-midia="${esc(id)}|${n}">${x.v ? "▶ Vídeo" : `Foto ${++fotos}`} · ${esc(x.n)}</button>`).join("");
+  abrirFolha(`Baixar · ${i.titulo}`, `<div class="mini" style="margin:4px 0">Toque pra salvar no celular ou mandar direto pro Instagram.</div>${botoes}`, "Fechar", () => true);
+}
+
 function acaoIdeia(id, acao) {
+  if (acao === "baixar") { abrirMidias(id); return; }
   if (acao === "imagem") {
     estado.alvoImagem = id;
     const campo = $("#ideia-arquivo-card"); if (campo) { campo.value = ""; campo.click(); }
@@ -957,6 +977,11 @@ document.addEventListener("click", async (e) => {
         if (p >= 0) i.formatos.splice(p, 1); else i.formatos.push(k);
       }));
     });
+    return;
+  }
+  if ((el = q("[data-baixar-midia]"))) {
+    const [id, n] = el.dataset.baixarMidia.split("|"), c = conteudo(), i = c.semana.concat(c.ideias).find((x) => x.id === id), m = i && i.midias && i.midias[Number(n)];
+    if (m) baixarMidia(m.u, m.n);
     return;
   }
   if ((el = q("[data-ideia-acao]"))) { acaoIdeia(el.dataset.ideia, el.dataset.ideiaAcao); return; }
