@@ -199,6 +199,17 @@ function listaDoDia() {
     ${linhas || '<div class="vazio">Nada na lista de hoje. Anote acima ou puxe de outras listas.</div>'}`;
 }
 
+// Compromissos de hoje e amanhã logo abaixo dos atalhos (03/11/2026); a agenda da semana continua no fim da tela.
+function agendaHojeAmanha(dias) {
+  const iso = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  const h = new Date(), a = new Date(h.getFullYear(), h.getMonth(), h.getDate() + 1);
+  const bloco = (rotulo, dt) => {
+    const lista = (dias[iso(dt)] || []).slice().sort((x, y) => String(x.hora).localeCompare(String(y.hora)));
+    return `<div class="card"><div class="p" style="margin:0 0 4px"><b>${rotulo}</b> · ${dataBr(iso(dt))}</div>${lista.map((e) => `<div class="t">${e.hora ? esc(e.hora) : "Dia todo"} ${esc(e.titulo)}</div>`).join("") || '<div class="p">Nada marcado.</div>'}</div>`;
+  };
+  return bloco("Hoje", h) + bloco("Amanhã", a);
+}
+
 function telaHoje() {
   const d = estado.dados, hoje = new Date();
   const dias = d.hoje.agenda.reduce((m, e) => { (m[e.dia] = m[e.dia] || []).push(e); return m; }, {});
@@ -211,8 +222,9 @@ function telaHoje() {
     <button class="atualizar" data-aba-ir="leads" aria-label="Leads">Leads${leadsDevidos() ? `<span class="nbadge">${leadsDevidos()}</span>` : ""}</button>
     <button class="atualizar" data-acao="atualizar">Atualizar</button></div></div>
     <form class="perg" data-form="pergunta"><input id="pergunta" placeholder="Pergunte ou peça algo ao Dudoo…" autocomplete="off"><button>Enviar</button></form>
-    <button class="btn o atalho" data-acao="nova-tarefa">+ Nova tarefa</button>
-    <button class="btn o atalho" data-acao="cadastro-lead">Cadastro de leads</button>
+    <div class="atalhos"><button class="btn o atalho" data-acao="nova-tarefa">+ Nova tarefa</button>
+    <button class="btn o atalho" data-acao="cadastro-lead">Cadastro de leads</button></div>
+    ${agendaHojeAmanha(dias)}
     ${estado.demo ? '<div class="card toque" data-aba-ir="mais"><div class="t"><b>Conectar ao Dudoo</b><div class="p">Você está vendo dados de exemplo. Toque para colar o link de conexão.</div></div></div>' : ""}
     ${estado.erroConexao ? `<div class="card pendente"><div class="p" style="margin:0">${esc(estado.erroConexao)} Mostrando os últimos dados.</div></div>` : ""}
     ${listaDoDia()}
