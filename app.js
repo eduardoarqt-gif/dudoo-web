@@ -417,6 +417,17 @@ function corpoPortal(p) {
 const MESES_NOME = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const rotuloMes = (m) => { const [a, n] = String(m).split("-"); return `${MESES_NOME[Number(n) - 1] || m} ${a}`; };
 
+// Despesa composta (fatura de cartão): toque em "Ver o que tem dentro" abre a lista das compras/parcelas que somam o valor.
+estado.compostasAbertas = estado.compostasAbertas || {};
+const chaveComposta = (x, mes) => `${x.id || x.descricao}|${mes}`;
+function blocoItensComposta(x, mes) {
+  const itens = x.itens || [];
+  if (!itens.length) return "";
+  const k = chaveComposta(x, mes), aberta = !!estado.compostasAbertas[k];
+  const lista = aberta ? `<div class="composta-itens">${itens.map((i) => `<div class="composta-item"><div class="t">${esc(i.descricao)}${i.parcela ? ` <span class="p">(${esc(i.parcela)})</span>` : ""}<div class="p">${dataBr(i.venc)}</div></div><span class="val">${brl(i.valor)}</span></div>`).join("")}</div>` : "";
+  return `<button class="expandir" data-composta="${esc(k)}" aria-expanded="${aberta}">${aberta ? "▴ Esconder" : "▾ Ver o que tem dentro"} · ${itens.length} ${itens.length === 1 ? "item" : "itens"}</button>${lista}`;
+}
+
 function telaFinanceiro() {
   if (!estado.liberado) {
     return `<div class="bloqueio"><h1>Financeiro</h1><div class="mini">Protegido por Face ID.</div><button class="btn" data-acao="liberar">Liberar com Face ID</button></div>`;
@@ -441,6 +452,7 @@ function telaFinanceiro() {
       const rotuloData = x.status === "vencida" ? "Venceu" : fechada ? (estado.finSub === "receber" ? "Recebida" : "Paga") : "Vence";
       const podeDesfazer = x.id && fechada && !semBaixa;
       return `<div class="card ${fechada ? "fechada" : ""} ${pend ? "pendente" : ""}"><div class="linha"><div class="t"><b>${esc(x.descricao)}</b><div class="p"><span style="color:${x.status === "vencida" ? "var(--verm)" : "inherit"}">${rotuloData} ${dataBr(fechada && x.baixa_em ? x.baixa_em : x.venc)}</span>${x.projeto ? " · " + esc(x.projeto) : ""}${pend ? " · aguardando o Dudoo" : ""}${x.fora_resumo ? " · fora do total" : ""}</div></div><span class="val dir">${brl(x.valor)}</span></div>
+        ${blocoItensComposta(x, mes)}
         ${fechada ? `<div class="rodape-baixa"><div class="p">✓ Baixa registrada</div>${podeDesfazer ? `<button class="desfaz" data-desfazer="${esc(x.id)}" aria-label="Desfazer baixa" title="Desfazer baixa">↶</button>` : ""}</div>` : podeBaixar ? `<button class="acao" data-baixa="${esc(x.id)}">✓ ${estado.finSub === "receber" ? (x.rt ? "Marcar recebida" : "Dar baixa") : "Marcar paga"}</button>` : `<div class="p">${semBaixa ? "Conta de terceiro: só consulta." : x.grupo === "cartoes" ? "Fatura estimada: baixa pelo Dudoo." : ""}</div>`}</div>`;
     }).join("") || `<div class="vazio">Nada em ${esc(rotuloMes(mes))}.</div>`;
   }
@@ -867,6 +879,7 @@ document.addEventListener("click", async (e) => {
     if (t) comando("concluir_tarefa", { projeto: p.id, tarefa_id: t.id, feita: !t.feita }, () => { t.feita = !t.feita; });
     return;
   }
+  if ((el = q("[data-composta]"))) { const k = el.dataset.composta; estado.compostasAbertas[k] = !estado.compostasAbertas[k]; desenhar(); return; }
   if ((el = q("[data-baixa]"))) {
     const pm = d.financeiro[estado.fin].por_mes[estado.mes] || { a_receber: [], a_pagar: [] };
     const lista = estado.finSub === "receber" ? pm.a_receber : pm.a_pagar, c = lista.find((x) => x.id === el.dataset.baixa);

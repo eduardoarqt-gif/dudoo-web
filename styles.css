@@ -78,6 +78,10 @@ textarea.campo{min-height:96px;resize:vertical}
 .vazio{color:var(--texto2);text-align:center;padding:26px 10px;font-size:14px}
 .pendente{border-left:3px solid var(--ambar)}
 .card.fechada .t b,.card.fechada .val{text-decoration:line-through;color:var(--texto2)}
+.expandir{background:none;border:0;padding:6px 0;margin:2px 0;color:var(--texto2);font:inherit;font-size:13px;cursor:pointer}
+.composta-itens{margin:4px 0 6px;padding:6px 10px;background:var(--borda);border-radius:10px}
+.composta-item{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:13px}
+.composta-item+.composta-item{border-top:1px solid rgba(0,0,0,.06)}
 .rodape-baixa{display:flex;align-items:center;justify-content:space-between;margin-top:2px}
 .desfaz{background:none;border:1px solid var(--borda);color:var(--texto2);border-radius:99px;width:34px;height:34px;font-size:17px;line-height:1;padding:0}
 #folha{position:fixed;inset:0;z-index:30}
