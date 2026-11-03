@@ -1083,19 +1083,27 @@ document.addEventListener("click", async (e) => {
         .map((p) => `<option value="${esc(p.codigo)}" ${p.id === estado.projeto ? "selected" : ""}>${esc(p.codigo)} ${esc(p.nome)}</option>`).join("");
       const campos = `<label class="rot">Tarefa</label><input class="campo" id="t-titulo" placeholder="Ex.: Ligar para o fornecedor" autocomplete="off">
         <label class="rot">Projeto</label><select class="campo" id="t-projeto"><option value="">Sem projeto</option>${projetos}</select>
-        <label class="rot">Prazo (opcional)</label><input class="campo" id="t-prazo" type="date">`;
+        <label class="rot">Prazo (opcional)</label>
+        <div class="linha" style="gap:8px;margin-top:8px"><button class="btn o" type="button" id="t-prazo-hoje">Hoje</button><button class="btn o" type="button" id="t-prazo-amanha">Amanhã</button></div>
+        <input class="campo" id="t-prazo" type="date" style="min-width:0;max-width:100%;box-sizing:border-box">
+        <label class="rot" style="display:flex;align-items:center;gap:10px;margin-top:14px"><input type="checkbox" id="t-no-dia" style="width:22px;height:22px"> Entrar na lista de hoje</label>`;
       abrirFolha("Nova tarefa", campos, "Criar", () => {
-        const titulo = ($("#t-titulo").value || "").trim(), codigo = $("#t-projeto").value || "", prazo = $("#t-prazo").value || "";
+        const titulo = ($("#t-titulo").value || "").trim(), codigo = $("#t-projeto").value || "", prazo = $("#t-prazo").value || "", noDia = !!$("#t-no-dia").checked;
         if (!titulo) { avisar("Escreva a tarefa."); return false; }
         const proj = d.projetos.find((x) => x.codigo === codigo);
         const nova = { id: "novo-" + Date.now(), titulo, feita: false, prazo };
-        comando("criar_tarefa", { titulo, projeto: codigo, prazo, local_id: nova.id }, () => {
+        comando("criar_tarefa", { titulo, projeto: codigo, prazo, no_dia: noDia, local_id: nova.id }, () => {
           if (proj) proj.tarefas.unshift(nova);
+          if (noDia) { d.hoje.dia = d.hoje.dia || []; d.hoje.dia.push({ id: nova.id, titulo, feita: false, origem: codigo || "Tarefa", atraso: 0, urgente: false, prazo }); }
           d.hoje.tarefas = d.hoje.tarefas || [];
           d.hoje.tarefas.unshift({ id: nova.id, titulo, projeto: codigo, prazo, atrasada: !!prazo && prazo < hoje });
         });
         avisar(proj ? `Tarefa criada em ${proj.codigo}. O Dudoo grava assim que estiver aberto.` : "Tarefa criada. O Dudoo grava assim que estiver aberto.");
       });
+      const dataIso = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+      $("#t-prazo-hoje").onclick = () => { $("#t-prazo").value = dataIso(new Date()); };
+      $("#t-prazo-amanha").onclick = () => { const x = new Date(); x.setDate(x.getDate() + 1); $("#t-prazo").value = dataIso(x); };
+      $("#t-no-dia").onchange = (e) => { if (e.target.checked && !$("#t-prazo").value) $("#t-prazo").value = dataIso(new Date()); };
       setTimeout(() => { const t = $("#t-titulo"); if (t) t.focus(); }, 60);
     } else if (a === "nova-receber" || a === "nova-pagar") {
       const receber = a === "nova-receber", escopo = estado.fin, hoje = new Date().toISOString().slice(0, 10);
