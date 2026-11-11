@@ -308,7 +308,7 @@ const notasVistasEm = () => ler(CHAVE_NOTAS_VISTAS, "");
 function novasNotas() {
   const visto = notasVistasEm();
   if (!visto) return 0;
-  return todasNotas().filter((n) => !n.pendente && String(n.atualizado || "") > visto).length;
+  return todasNotas().filter((n) => !n.projeto && !n.pendente && String(n.atualizado || "") > visto).length;
 }
 function marcarNotasVistas() {
   const maior = todasNotas().reduce((m, n) => (String(n.atualizado || "") > m ? String(n.atualizado) : m), "");
@@ -346,13 +346,10 @@ function abrirNota(id) {
     avisar("Nota guardada. O Dudoo grava e manda pro Simplenote quando estiver aberto.");
   });
 }
+// Aba Notas (Ferramentas): só as notas GERAIS (sem projeto). As notas de projeto ficam dentro do projeto (Eduardo, 11/11/2026).
 function telaNotas(embutida) {
-  const filtro = estado.filtroNotas;
-  const d = estado.dados;
-  const opcoes = [`<option value="__todas" ${filtro === "__todas" ? "selected" : ""}>Todas as notas</option>`, `<option value="" ${filtro === "" ? "selected" : ""}>Sem projeto</option>`]
-    .concat(d.projetos.map((p) => `<option value="${esc(p.codigo)}" ${filtro === p.codigo ? "selected" : ""}>${esc(p.codigo)} ${esc(p.nome)}</option>`)).join("");
-  return `${embutida ? "" : '<button class="voltar" data-acao="voltar-hoje">‹ Hoje</button><h1>Notas</h1>'}<div class="mini">Sincronizadas com o Simplenote · etiqueta = número do projeto</div>
-    <select class="campo" id="nota-filtro">${opcoes}</select>${blocoNotas(filtro === "__todas" ? undefined : filtro)}`;
+  return `${embutida ? "" : '<button class="voltar" data-acao="voltar-hoje">‹ Hoje</button><h1>Notas</h1>'}<div class="mini">Notas gerais, sincronizadas com o Simplenote · as de projeto ficam dentro do projeto</div>
+    ${blocoNotas("")}`;
 }
 
 // ---------------------------------------------------------------- leads (WhatsApp com texto pronto + "Enviei?")
