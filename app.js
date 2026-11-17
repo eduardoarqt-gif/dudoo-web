@@ -390,13 +390,15 @@ function blocoProposta(l) {
   const pdf = p.pdf || {};
   // Arquivo financeiro fica só no OneDrive do PC (regra do Eduardo): o celular não abre o PDF, só informa.
   const botaoPdf = `<div class="p" style="margin-top:6px">${pdf.estado === "so_no_pc" ? "PDF do orçamento: só no PC (arquivo financeiro fica no OneDrive)" + (pdf.nome ? "<br>" + esc(pdf.nome) : "") : "PDF ainda não gerado no Dudoo."}</div>`;
-  return `<div style="border-top:1px solid var(--borda);margin-top:8px;padding-top:8px"><div class="linha" style="justify-content:space-between"><div class="t"><b>Proposta ${esc(p.revisao || "")}</b><div class="p">${esc(p.titulo || "")}</div></div>
-      <span class="pill ${p.enviada ? "v" : "a"}">${esc(String(p.status || "").toUpperCase())}</span></div>
-    <div class="mini" style="margin:2px 0 6px">${(p.revisoes || []).length > 1 ? esc(p.revisoes.join(" → ")) : ""}${p.data ? ((p.revisoes || []).length > 1 ? " · " : "") + (p.enviada ? "enviada/atualizada em " : "atualizada em ") + dataCompleta(p.data) : ""}</div>
+  const titulo = String(p.titulo || "").replace(/^(\S+)\s+\s+/, "$1 ");      // "034-26 034-26 NOME" -> "034-26 NOME"
+  // Recolhida por padrão (reunião: abre só o que precisa); toque no cabeçalho expande.
+  return `<details class="proposta-lead" style="border-top:1px solid var(--borda);margin-top:8px;padding-top:8px"><summary style="list-style:none;cursor:pointer"><div class="linha" style="justify-content:space-between;align-items:center"><div class="t"><b>Proposta ${esc(p.revisao || "")} · ${brl(p.total)}</b><div class="p">${esc(titulo)}</div></div>
+      <span class="pill ${p.enviada ? "v" : "a"}">${esc(String(p.status || "").toUpperCase())} ▾</span></div></summary>
+    <div class="mini" style="margin:6px 0">${(p.revisoes || []).length > 1 ? esc(p.revisoes.join(" → ")) : ""}${p.data ? ((p.revisoes || []).length > 1 ? " · " : "") + (p.enviada ? "enviada/atualizada em " : "atualizada em ") + dataCompleta(p.data) : ""}</div>
     ${itens}
     <div class="linha" style="justify-content:space-between;margin-top:8px;font-size:17px"><span>Total</span><b>${brl(p.total)}</b></div>
     ${(p.condicoes || []).length ? `<div class="mini" style="margin-top:8px"><b>Condições de pagamento</b></div>${p.condicoes.map((c) => `<div class="p">• ${esc(c)}</div>`).join("")}` : ""}
-    ${botaoPdf}</div>`;
+    ${botaoPdf}</details>`;
 }
 function telaLeads() {
   const aguarda = ler(CHAVE_LEAD_AGUARDA, null);
