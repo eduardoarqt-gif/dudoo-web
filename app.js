@@ -958,7 +958,8 @@ document.addEventListener("click", async (e) => {
     const receber = estado.finSub === "receber", lista = receber ? pm.a_receber : pm.a_pagar, c = lista.find((x) => x.id === el.dataset.desfazer);
     if (!c) return;
     const natureza = receber ? (c.rt ? "rt" : "receber") : "pagar";
-    comando("desfazer_baixa", { conta_id: c.id, projeto: c.projeto || "", escopo: estado.fin, grupo: c.grupo || "", natureza },
+    if (!confirm(`Desfazer a baixa de "${c.descricao}"? Isso apaga a data, a conta e o valor pagos registrados.`)) return;
+    comando("desfazer_baixa", { conta_id: c.id, projeto: c.projeto || "", escopo: estado.fin, grupo: c.grupo || "", natureza, confirmado: true },
       () => { c.status = (c.venc && c.venc < new Date().toISOString().slice(0, 10)) ? "vencida" : "aberta"; c.baixa_em = ""; });
     avisar("Baixa desfeita. O Dudoo aplica assim que estiver aberto.");
     return;
