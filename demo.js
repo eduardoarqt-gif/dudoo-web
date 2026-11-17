@@ -34,7 +34,7 @@ window.DUDOO_DEMO = {
       proposta: { codigo: "034-26", titulo: "034-26 VENTISOL (REFEITÓRIO)", revisao: "R03", revisoes: ["R01", "R02", "R03"], status: "Enviado", enviada: true, data: "2026-11-12",
         itens: [{ nome: "Projeto de arquitetura", valor: 51890, per: "" }, { nome: "Obra", valor: 21630, per: "" }, { nome: "Interiores", valor: 25900, per: "" }, { nome: "Acompanhamento mensal", valor: 7000, per: "mensal" }],
         total: 99420, condicoes: ["PIX à vista com 10% de desconto: R$ 89.478,00", "Boleto em 6x de R$ 16.570,00 (total: R$ 99.420,00)", "Cartão em até 12x de aproximadamente R$ 8.900,00 (total estimado: R$ 106.800,00)"],
-        pdf: { path: "/demo/Proposta Comercial 034-26 R03.pdf", nome: "Proposta Comercial 034-26 R03.pdf", kb: 820, em: "2026-11-12T10:00" } } },
+        pdf: { estado: "so_no_pc", nome: "Proposta Comercial 034-26 R03.pdf" } } },
   ],
   marketing: { posts: [
     { id: "p1", tipo: "feed", titulo: "Cozinha integrada: antes e depois", data: new Date(Date.now() + 86400000).toISOString().slice(0, 10), hora: "11:00",
