@@ -29,6 +29,13 @@ window.DUDOO_DEMO = {
     { id: "n1", titulo: "101-26 Ana E Pedro Souza", texto: "101-26 Ana E Pedro Souza" + String.fromCharCode(10) + "Cliente quer trocar o piso da varanda por porcelanato 120x120. Ver prazo com o fornecedor.", projeto: "101-26", atualizado: new Date().toISOString() },
     { id: "n2", titulo: "Ideias para a vitrine da semana", texto: "Ideias para a vitrine da semana" + String.fromCharCode(10) + "Mostrar antes e depois da cozinha do Marina Costa.", projeto: "", atualizado: new Date(Date.now() - 86400000).toISOString() }
   ],
+  leads: [
+    { id: "L1", nome: "Ventisol Indústria e Comércio S/A", telefone: "(11) 99999-0000", status: "orcamento_enviado", origem: "Indicação", ultimo_contato: "2026-11-10", etapa: 1, devido: false, numero: 0, texto: "",
+      proposta: { codigo: "034-26", titulo: "034-26 VENTISOL (REFEITÓRIO)", revisao: "R03", revisoes: ["R01", "R02", "R03"], status: "Enviado", enviada: true, data: "2026-11-12",
+        itens: [{ nome: "Projeto de arquitetura", valor: 51890, per: "" }, { nome: "Obra", valor: 21630, per: "" }, { nome: "Interiores", valor: 25900, per: "" }, { nome: "Acompanhamento mensal", valor: 7000, per: "mensal" }],
+        total: 99420, condicoes: ["PIX à vista com 10% de desconto: R$ 89.478,00", "Boleto em 6x de R$ 16.570,00 (total: R$ 99.420,00)", "Cartão em até 12x de aproximadamente R$ 8.900,00 (total estimado: R$ 106.800,00)"],
+        pdf: { path: "/demo/Proposta Comercial 034-26 R03.pdf", nome: "Proposta Comercial 034-26 R03.pdf", kb: 820, em: "2026-11-12T10:00" } } },
+  ],
   marketing: { posts: [
     { id: "p1", tipo: "feed", titulo: "Cozinha integrada: antes e depois", data: new Date(Date.now() + 86400000).toISOString().slice(0, 10), hora: "11:00",
       legenda: "Antes e depois da cozinha integrada. O que você mudaria?", status: "agendado", projeto: "", midias: 3, erro: "", editavel: true, link: "" },

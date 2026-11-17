@@ -381,12 +381,47 @@ function linkWhatsapp(tel, texto) {
   if (n.length === 10 || n.length === 11) n = "55" + n;
   return "https://wa.me/" + n + (texto ? "?text=" + encodeURIComponent(texto) : "");
 }
+// Proposta do lead (17/11/2026, Eduardo): na reunião de negociação, a ÚLTIMA proposta enviada ao lead — resumo + PDF. Só consulta (sem comando de escrita).
+const dataCompleta = (iso) => { const [a, m, d] = String(iso || "").slice(0, 10).split("-"); return d ? `${d}/${m}/${a}` : ""; };
+function blocoProposta(l) {
+  const p = l.proposta;
+  if (!p) return "";
+  const itens = (p.itens || []).map((i) => `<div class="linha" style="justify-content:space-between;margin-top:3px"><span>${esc(i.nome)}</span><b>${brl(i.valor)}${i.per === "mensal" ? " /mês" : ""}</b></div>`).join("");
+  const pdf = p.pdf || {};
+  const botaoPdf = pdf.path ? `<button class="btn peq" data-proposta-pdf="${esc(l.id)}">${estadoProposta.baixando === l.id ? "Baixando…" : "Abrir PDF"}</button><span class="mini">${pdf.kb ? (pdf.kb >= 1024 ? (pdf.kb / 1024).toFixed(1) + " MB" : pdf.kb + " KB") : ""}</span>`
+    : `<div class="p" style="margin-top:6px">${pdf.estado === "fora_dropbox" ? "PDF fora do Dropbox: não dá pra abrir no celular." : "PDF ainda não gerado no Dudoo."}</div>`;
+  return `<div style="border-top:1px solid var(--borda);margin-top:8px;padding-top:8px"><div class="linha" style="justify-content:space-between"><div class="t"><b>Proposta ${esc(p.revisao || "")}</b><div class="p">${esc(p.titulo || "")}</div></div>
+      <span class="pill ${p.enviada ? "v" : "a"}">${esc(String(p.status || "").toUpperCase())}</span></div>
+    <div class="mini" style="margin:2px 0 6px">${(p.revisoes || []).length > 1 ? esc(p.revisoes.join(" → ")) : ""}${p.data ? ((p.revisoes || []).length > 1 ? " · " : "") + (p.enviada ? "enviada/atualizada em " : "atualizada em ") + dataCompleta(p.data) : ""}</div>
+    ${itens}
+    <div class="linha" style="justify-content:space-between;margin-top:8px;font-size:17px"><span>Total</span><b>${brl(p.total)}</b></div>
+    ${(p.condicoes || []).length ? `<div class="mini" style="margin-top:8px"><b>Condições de pagamento</b></div>${p.condicoes.map((c) => `<div class="p">• ${esc(c)}</div>`).join("")}` : ""}
+    ${botaoPdf}</div>`;
+}
+const estadoProposta = { baixando: "" };
+// Abre o PDF da proposta: baixa pelo Dropbox (a mesma conexão do Revisar PDF, revisao.js) e mostra no visualizador do celular.
+async function abrirPdfProposta(l) {
+  const pdf = (l.proposta || {}).pdf || {};
+  if (!pdf.path || estadoProposta.baixando) return;
+  if (typeof rvConectado !== "function" || !rvConectado()) {
+    if (typeof rvIniciarAutorizacao === "function" && rvAppKey()) { avisar("Conecte o Dropbox uma vez pra abrir os PDFs."); rvIniciarAutorizacao(); } else avisar("O Dudoo do computador ainda não mandou a chave do Dropbox. Abra o Dudoo e atualize.");
+    return;
+  }
+  const janela = window.open("", "_blank");               // aberta já no toque (o iPhone bloqueia janela aberta depois do download)
+  estadoProposta.baixando = l.id; desenhar();
+  try {
+    const bytes = await rvBaixar(pdf.path);
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    if (janela) janela.location.href = url; else window.location.href = url;
+  } catch (e) { if (janela) janela.close(); avisar(e.message || String(e)); }
+  estadoProposta.baixando = ""; desenhar();
+}
 function telaLeads() {
   const aguarda = ler(CHAVE_LEAD_AGUARDA, null);
   const lista = leadsLista();
   const cartao = (l) => `<div class="card"><div class="linha"><div class="t"><b>${esc(l.nome)}</b><div class="p">${esc(rotuloStatus(l.status))}${l.origem ? " · " + esc(l.origem) : ""}${l.ultimo_contato ? " · último contato " + esc(l.ultimo_contato.split("-").reverse().join("/")) : " · sem contato"}</div></div>${l.devido ? `<span class="pill c dir">MSG ${l.numero}</span>` : ""}</div>
     ${l.devido && l.texto ? `<div class="p" style="margin:6px 0">${esc(l.texto.slice(0, 160))}${l.texto.length > 160 ? "…" : ""}</div>` : ""}
-    ${l.telefone ? `<button class="btn peq" data-lead-wa="${esc(l.id)}">WhatsApp${l.devido ? " com a mensagem" : ""}</button>` : '<div class="p">Sem telefone cadastrado.</div>'}</div>`;
+    ${l.telefone ? `<button class="btn peq" data-lead-wa="${esc(l.id)}">WhatsApp${l.devido ? " com a mensagem" : ""}</button>` : '<div class="p">Sem telefone cadastrado.</div>'}${blocoProposta(l)}</div>`;
   return `<button class="voltar" data-acao="voltar-hoje">‹ Hoje</button><h1>Leads</h1><div class="mini">${lista.length} em andamento · ${leadsDevidos()} com follow-up hoje</div>
     <button class="btn o atalho" data-acao="cadastro-lead">+ Cadastro de leads</button>
     ${aguarda ? `<div class="card toque" data-lead-confirmar="1"><div class="t"><b>Você enviou a mensagem para ${esc(aguarda.nome)}?</b><div class="p">Toque para confirmar e registrar o contato.</div></div></div>` : ""}
@@ -947,6 +982,7 @@ document.addEventListener("click", async (e) => {
     if (l) { gravar(CHAVE_LEAD_AGUARDA, { id: l.id, nome: l.nome, numero: l.devido ? l.numero : 0 }); window.open(linkWhatsapp(l.telefone, l.devido ? l.texto : ""), "_blank"); }
     return;
   }
+  if ((el = q("[data-proposta-pdf]"))) { const l = leadsLista().find((x) => x.id === el.dataset.propostaPdf); if (l) abrirPdfProposta(l); return; }
   if (q("[data-lead-confirmar]")) { perguntarEnviei(); return; }
   if ((el = q("[data-precisa]"))) {
     const item = d.hoje.precisa.find((x) => x.id === el.dataset.precisa);
