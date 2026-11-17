@@ -390,7 +390,7 @@ function blocoProposta(l) {
   const pdf = p.pdf || {};
   // Arquivo financeiro fica só no OneDrive do PC (regra do Eduardo): o celular não abre o PDF, só informa.
   const botaoPdf = `<div class="p" style="margin-top:6px">${pdf.estado === "so_no_pc" ? "PDF do orçamento: só no PC (arquivo financeiro fica no OneDrive)" + (pdf.nome ? "<br>" + esc(pdf.nome) : "") : "PDF ainda não gerado no Dudoo."}</div>`;
-  const titulo = String(p.titulo || "").replace(/^(\S+)\s+\s+/, "$1 ");      // "034-26 034-26 NOME" -> "034-26 NOME"
+  const titulo = String(p.titulo || "").replace(/^(\S+)\s+\1\s+/, "$1 ");      // "034-26 034-26 NOME" -> "034-26 NOME"
   // Recolhida por padrão (reunião: abre só o que precisa); toque no cabeçalho expande.
   return `<details class="proposta-lead" style="border-top:1px solid var(--borda);margin-top:8px;padding-top:8px"><summary style="list-style:none;cursor:pointer"><div class="linha" style="justify-content:space-between;align-items:center"><div class="t"><b>Proposta ${esc(p.revisao || "")} · ${brl(p.total)}</b><div class="p">${esc(titulo)}</div></div>
       <span class="pill ${p.enviada ? "v" : "a"}">${esc(String(p.status || "").toUpperCase())} ▾</span></div></summary>
