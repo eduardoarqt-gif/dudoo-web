@@ -214,7 +214,9 @@ function telaHoje() {
   const d = estado.dados, hoje = new Date();
   const dias = d.hoje.agenda.reduce((m, e) => { (m[e.dia] = m[e.dia] || []).push(e); return m; }, {});
   const sem = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
-  const hojeIso = hoje.toISOString().slice(0, 10);
+  const isoLocal = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  const hojeIso = isoLocal(hoje), amanhaIso = isoLocal(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 1));
+  const diasDepois = Object.keys(dias).filter((dia) => dia !== hojeIso && dia !== amanhaIso).sort();      // hoje e amanhã já aparecem no topo
   const data = hoje.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
   const hora = hoje.getHours(), saud = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
   return `<div class="topo"><div><h1>${saud}, ${esc(d.usuario.nome)}!</h1><div class="mini">${esc(data)} · ${d.projetos.filter((p) => p.estado === "ativo").length} projetos ativos</div>${estado.demo ? '<span class="demo">dados de exemplo</span>' : ""}</div>
@@ -232,8 +234,8 @@ function telaHoje() {
     ${d.hoje.precisa.map((i) => `<div class="card toque" data-precisa="${esc(i.id)}"><div class="linha"><div class="t">${esc(i.titulo)}<div class="p">${esc(i.detalhe)}</div></div><span class="pill ${i.cor || "c"} dir">${esc(i.badge)}</span></div></div>`).join("") || '<div class="vazio">Nada pendente agora.</div>'}
     <h2 class="sec">Tarefas · ${(d.hoje.tarefas || []).length}</h2>
     ${(d.hoje.tarefas || []).map((t) => `<div class="card"><div class="linha"><button class="check" data-tarefa-hoje="${esc(t.id)}" aria-label="Concluir"></button><div class="t">${esc(t.titulo)}<div class="p">${t.projeto ? esc(t.projeto) : "Sem projeto"}${t.prazo ? ` · <span style="color:${t.atrasada ? "var(--verm)" : "inherit"}">${t.atrasada ? "atrasada · " : ""}${dataBr(t.prazo)}</span>` : ""}</div></div></div></div>`).join("") || '<div class="vazio">Sem tarefas abertas.</div>'}
-    <h2 class="sec">Agenda</h2>
-    ${Object.keys(dias).sort().map((dia) => { const dt = new Date(dia + "T12:00"); return `<div class="card"><div class="p" style="margin:0 0 4px">${sem[dt.getDay()]} ${dataBr(dia)}${dia === hojeIso ? " · hoje" : ""}</div>${dias[dia].map((e) => `<div class="t">${esc(e.hora)} ${esc(e.titulo)}</div>`).join("")}</div>`; }).join("") || '<div class="vazio">Sem compromissos nesta semana.</div>'}`;
+    ${diasDepois.length ? '<h2 class="sec">Próximos dias</h2>' : ""}
+    ${diasDepois.map((dia) => { const dt = new Date(dia + "T12:00"); return `<div class="card"><div class="p" style="margin:0 0 4px">${sem[dt.getDay()]} ${dataBr(dia)}${dia === hojeIso ? " · hoje" : ""}</div>${dias[dia].map((e) => `<div class="t">${esc(e.hora)} ${esc(e.titulo)}</div>`).join("")}</div>`; }).join("") || '<div class="vazio">Sem compromissos nesta semana.</div>'}`;
 }
 
 function telaProjetos() {
