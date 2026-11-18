@@ -19,6 +19,21 @@ const estado = {
 // ---------------------------------------------------------------- dados
 const cfg = () => ler(CHAVE_CFG, { base: "", token: "" });
 
+// Chamada ao serviço do Dudoo (Wix). Com a chave própria do celular (pareamento) manda só `X-Dudoo-Chave`; sem ela, o token do link antigo.
+// Se a chave for recusada (403): pergunta se foi revogada; revogada = apaga a chave deste aparelho e, havendo token do link antigo, repete com ele
+// (senão fica pedindo novo pareamento). Nunca escreve chave/token em log ou aviso.
+async function chamarApi(caminho, opcoes) {
+  const c = cfg(), url = `${c.base.replace(/\/$/, "")}/${caminho}`;
+  const montar = (cab) => fetch(url, { ...opcoes, headers: { ...((opcoes && opcoes.headers) || {}), ...cab } });
+  const r = await montar(DudooPareamento.cabecalhos(c));
+  if (r.status !== 403 || !c.chave) return r;
+  const situacao = await DudooPareamento.situacaoDaChave(c.base, c.chave, fetch);
+  if (situacao === "revogada") {
+    gravar(CHAVE_CFG, { ...c, chave: "", chaveId: "", pareadoEm: "", revogada: true });       // guarda só o aviso (a chave morta é apagada)
+  }
+  return c.token && situacao !== "ativa" ? montar({ "X-Dudoo-Token": c.token }) : r;
+}
+
 // Garante a estrutura nova do financeiro (por mês) mesmo com foto antiga/demonstração.
 function normalizarFinanceiro(d) {
   d.notas = Array.isArray(d.notas) ? d.notas : [];
@@ -39,15 +54,15 @@ function normalizarFinanceiro(d) {
 async function carregar(forcar) {
   const c = cfg();
   estado.erroConexao = "";
-  if (!c.base || !c.token) {
+  if (!DudooPareamento.temCredencial(c)) {
     estado.demo = true;
     estado.dados = normalizarFinanceiro(estado.dados || JSON.parse(JSON.stringify(window.DUDOO_DEMO)));
     return;
   }
   estado.demo = false;
   try {
-    const r = await fetch(`${c.base.replace(/\/$/, "")}/dudoo_web_snapshot`, { headers: { "X-Dudoo-Token": c.token } });
-    if (!r.ok) throw new Error(r.status === 403 ? "Chave de acesso não aceita pelo Wix." : `Erro ${r.status} do serviço.`);
+    const r = await chamarApi("dudoo_web_snapshot", {});
+    if (!r.ok) throw new Error(r.status === 403 ? (cfg().revogada ? "Este celular foi desconectado do Dudoo. Faça um novo pareamento com o código." : "Chave de acesso não aceita pelo Wix. Faça um novo pareamento com o código.") : `Erro ${r.status} do serviço.`);
     const j = await r.json();
     if (j.vazio || !j.hoje) throw new Error("O Dudoo ainda não publicou os dados. Abra o Dudoo no computador.");
     estado.dados = normalizarFinanceiro(j);
@@ -73,11 +88,11 @@ function comando(tipo, payload, aplicarLocal) {
 
 async function enviarFila() {
   const c = cfg();
-  if (estado.demo || !c.base) return;                      // demonstração: fica só marcado como pendente
+  if (estado.demo || !DudooPareamento.temCredencial(c)) return;                      // demonstração: fica só marcado como pendente
   for (const item of estado.fila.filter((i) => i.status === "pendente")) {
     try {
-      const r = await fetch(`${c.base.replace(/\/$/, "")}/dudoo_web_comando`, {
-        method: "POST", headers: { "Content-Type": "application/json", "X-Dudoo-Token": c.token },
+      const r = await chamarApi("dudoo_web_comando", {
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: item.id, tipo: item.tipo, payload: item.payload, criado: item.criado }),
       });
       if (!r.ok) throw new Error(r.status);
@@ -126,7 +141,7 @@ async function copiarTexto(texto) {
 
 function avisar(texto) {
   const a = $("#aviso"); a.textContent = texto; a.hidden = false;
-  clearTimeout(avisar.t); avisar.t = setTimeout(() => { a.hidden = true; }, 3200);
+  clearTimeout(avisar.t); avisar.t = setTimeout(() => { a.hidden = true; }, Math.max(3200, String(texto).length * 55));
 }
 
 // ---------------------------------------------------------------- Face ID (WebAuthn) com PIN de reserva
@@ -495,10 +510,21 @@ function telaFinanceiro() {
     ${estado.finSub === "receber" ? '<button class="fab" data-acao="nova-receber">+ Conta a receber</button>' : estado.finSub === "pagar" ? '<button class="fab" data-acao="nova-pagar">+ Conta a pagar</button>' : ""}`;
 }
 
+function textoConexao() {
+  const c = cfg();
+  if (c.chave) return "Conectado com a chave deste celular" + (c.pareadoEm ? ` (pareado em ${DudooPareamento.dataCompleta(c.pareadoEm)})` : "");
+  if (c.revogada && !c.token) return "Celular desconectado do Dudoo: faça um novo pareamento com o código";
+  return "Conectado pelo link antigo (pareie com código para trocar por uma chave própria deste celular)";
+}
+
 function blocoConexao() {
-  return `<div class="p" style="margin:0 0 6px">Cole o link de conexão que o Dudoo copiou (Configurações → Dudoo Web → Copiar link de conexão do iPhone).</div>
-    <textarea class="campo" id="cfg-link" placeholder="https://eduardoarqt-gif.github.io/dudoo-web/#c=..." style="min-height:70px;margin-top:0"></textarea>
-    <button class="btn" data-acao="colar-link">Conectar</button>`;
+  return `<div class="p" style="margin:0 0 6px"><b>Conectar com código.</b> No Dudoo do computador, abra Configurações → Dudoo Web → Parear celular e digite aqui o código de 8 caracteres (vale 5 minutos e só funciona uma vez).</div>
+    <input class="campo" id="cfg-codigo" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12" placeholder="ABCD 2345" style="margin-top:0;letter-spacing:.15em;text-transform:uppercase">
+    <button class="btn" data-acao="parear-codigo">Conectar com código</button>
+    <details style="margin-top:12px"><summary class="p" style="margin:0">Usar o link de conexão (método antigo)</summary>
+      <div class="p" style="margin:8px 0 6px">Cole o link que o Dudoo copiou (Configurações → Dudoo Web → Copiar link de conexão do iPhone).</div>
+      <textarea class="campo" id="cfg-link" placeholder="https://eduardoarqt-gif.github.io/dudoo-web/#c=..." style="min-height:70px;margin-top:0"></textarea>
+      <button class="btn o" data-acao="colar-link">Conectar pelo link</button></details>`;
 }
 
 // Ferramentas (18/10/2026): o mesmo menu do Dudoo do computador — Ferramentas → Geral · Notas · Quadro. Regra: toda tela do app segue o menu e a sub-aba do PC.
@@ -515,7 +541,7 @@ function telaMais() {
   const ponto = estado.dados.usuario.ponto === "dentro";
   return `<h2 class="sec">Geral</h2>
     <h2 class="sec">Ponto</h2><div class="card"><div class="linha"><div class="t">${ponto ? "Você está com o ponto aberto" : "Ainda não bateu o ponto"}</div></div><button class="btn" data-acao="ponto">${ponto ? "Registrar saída" : "Registrar entrada"}</button></div>
-    <h2 class="sec">Conexão com o Dudoo</h2><div class="card"><div class="p" style="margin:0 0 8px">${estado.demo ? "Modo demonstração (dados de exemplo)." : "Conectado" + (estado.ultimaAtualizacao ? " · atualizado às " + estado.ultimaAtualizacao : "")}${estado.erroConexao ? " · " + esc(estado.erroConexao) : ""}${pendentes() ? ` · ${pendentes()} ação(ões) aguardando envio` : ""}</div>
+    <h2 class="sec">Conexão com o Dudoo</h2><div class="card"><div class="p" style="margin:0 0 8px">${estado.demo ? "Modo demonstração (dados de exemplo)." : textoConexao() + (estado.ultimaAtualizacao ? " · atualizado às " + estado.ultimaAtualizacao : "")}${estado.erroConexao ? " · " + esc(estado.erroConexao) : ""}${pendentes() ? ` · ${pendentes()} ação(ões) aguardando envio` : ""}</div>
       ${blocoConexao()}</div>
     <h2 class="sec">Sobre</h2><div class="card"><div class="p" style="margin:0">Dudoo Web 1.0 · Adicione à Tela de Início para abrir como app.</div></div>`;
 }
@@ -1153,6 +1179,18 @@ document.addEventListener("click", async (e) => {
         });
         avisar(parcelas > 1 ? `Conta criada em ${parcelas} parcelas. O Dudoo grava assim que estiver aberto.` : "Conta criada. O Dudoo grava assim que estiver aberto.");
       });
+    } else if (a === "parear-codigo") {
+      const botao = e.target.closest("[data-acao]"), campo = $("#cfg-codigo");
+      if (botao.disabled) return;
+      botao.disabled = true;
+      try {
+        const c = cfg();
+        const nova = await DudooPareamento.trocarCodigo(c.base || DudooPareamento.BASE_PADRAO, campo ? campo.value : "", DudooPareamento.rotuloDoAparelho(navigator.userAgent), fetch);
+        gravar(CHAVE_CFG, { base: c.base || DudooPareamento.BASE_PADRAO, token: c.token || "", chave: nova.chave, chaveId: nova.chaveId, pareadoEm: nova.criadoEm || new Date().toISOString(), revogada: false });
+        if (campo) campo.value = "";
+        await carregar(true); await enviarFila(); desenhar(); avisar(estado.erroConexao || "Celular pareado com o Dudoo.");
+      } catch (erro) { avisar(String(erro.message || erro)); }
+      finally { botao.disabled = false; }
     } else if (a === "colar-link") {
       const texto = (($("#cfg-link") || {}).value || "").trim();
       const ok = conectarPorLink(texto);
