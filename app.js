@@ -3,7 +3,7 @@
    Sem conexão configurada o app abre em modo demonstração com dados de exemplo. */
 "use strict";
 
-const CHAVE_CFG = "dudoo_web_cfg", CHAVE_FILA = "dudoo_web_fila", CHAVE_DADOS = "dudoo_web_dados", CHAVE_CRED = "dudoo_web_cred", CHAVE_PIN = "dudoo_web_pin", CHAVE_NOTAS_VISTAS = "dudoo_web_notas_vistas";
+const CHAVE_CFG = "dudoo_web_cfg", CHAVE_FILA = "dudoo_web_fila", CHAVE_DADOS = "dudoo_web_dados", CHAVE_CRED = "dudoo_web_cred", CHAVE_PIN = "dudoo_web_pin", CHAVE_NOTAS_VISTAS = "dudoo_web_notas_vistas", CHAVE_PUSH_PREF = "dudoo_web_push_pref";
 const $ = (s) => document.querySelector(s);
 const ler = (k, padrao) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch (e) { return padrao; } };
 const gravar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sem armazenamento: segue em memória */ } };
@@ -537,12 +537,38 @@ function telaFerramentas() {
   return `<h1>Ferramentas</h1>${menu}${corpo}`;
 }
 
+// Notificações push (23/11/2026): o motor e as categorias vêm do Dudoo (núcleo padrão); aqui só ativar/desativar e as preferências.
+function prefPush() { return ler(CHAVE_PUSH_PREF, { categorias: {}, silencio: {} }); }
+function blocoNotificacoes() {
+  const sit = estado.pushSit || { suportado: false, instalado: false, inscrito: false, permissao: "default" };
+  const push = (estado.dados && estado.dados.push) || {};
+  if (estado.demo) return '<div class="card"><div class="p" style="margin:0">Conecte o app ao Dudoo para ativar os avisos.</div></div>';
+  if (!sit.suportado) return '<div class="card"><div class="p" style="margin:0">Este navegador não oferece notificações. No iPhone, use o app da Tela de Início (iOS 16.4 ou mais novo).</div></div>';
+  if (!sit.instalado) return '<div class="card"><div class="p" style="margin:0">Para receber avisos, adicione o Dudoo Web à Tela de Início (Compartilhar → Adicionar à Tela de Início) e abra por lá.</div></div>';
+  if (!push.chave_publica) return '<div class="card"><div class="p" style="margin:0">O Dudoo ainda não preparou as notificações. Abra o Dudoo no computador (versão atualizada) e toque em Atualizar.</div></div>';
+  if (!sit.inscrito) return `<div class="card"><div class="p" style="margin:0 0 8px">Receba aviso quando o cliente aprovar, comentar, chegar um lead, cair um recebimento e mais. Os avisos saem com o Dudoo aberto no computador e nunca mostram valores.</div><button class="btn" data-acao="push-ativar">Ativar avisos</button></div>`;
+  const m = DudooPush.mesclar(push, prefPush());
+  const linhas = m.categorias.map((c) => `<div class="linha"><div class="t">${esc(c.rotulo)}</div><button class="btn ${c.ligada ? "" : "o"} peq" data-push-cat="${esc(c.id)}">${c.ligada ? "Ligado" : "Desligado"}</button></div>`).join("");
+  const s = m.silencio || {};
+  return `<div class="card"><div class="p" style="margin:0 0 8px">Avisos ativos neste aparelho. A escolha vale depois que o Dudoo aplicar (até 15 min).</div>${linhas}
+    <div class="linha" style="margin-top:10px"><div class="t">Silêncio${s.ativo ? ` das ${esc(s.de)} às ${esc(s.ate)}` : ""}</div><button class="btn ${s.ativo ? "" : "o"} peq" data-acao="push-silencio">${s.ativo ? "Ligado" : "Desligado"}</button></div>
+    ${s.ativo ? `<div class="linha"><input class="campo" id="push-de" type="time" value="${esc(s.de || "22:00")}" style="margin:0"><input class="campo" id="push-ate" type="time" value="${esc(s.ate || "07:00")}" style="margin:0"><button class="btn o peq" data-acao="push-horario">Salvar</button></div>` : ""}
+    <button class="btn o" data-acao="push-desativar" style="margin-top:10px">Desativar neste aparelho</button></div>`;
+}
+function guardarPrefPush(parcial) {
+  const atual = prefPush();
+  const novo = { categorias: { ...atual.categorias, ...(parcial.categorias || {}) }, silencio: { ...atual.silencio, ...(parcial.silencio || {}) } };
+  gravar(CHAVE_PUSH_PREF, novo);
+  comando("preferencias_push", parcial, null);
+}
+
 function telaMais() {
   const ponto = estado.dados.usuario.ponto === "dentro";
   return `<h2 class="sec">Geral</h2>
     <h2 class="sec">Ponto</h2><div class="card"><div class="linha"><div class="t">${ponto ? "Você está com o ponto aberto" : "Ainda não bateu o ponto"}</div></div><button class="btn" data-acao="ponto">${ponto ? "Registrar saída" : "Registrar entrada"}</button></div>
     <h2 class="sec">Conexão com o Dudoo</h2><div class="card"><div class="p" style="margin:0 0 8px">${estado.demo ? "Modo demonstração (dados de exemplo)." : textoConexao() + (estado.ultimaAtualizacao ? " · atualizado às " + estado.ultimaAtualizacao : "")}${estado.erroConexao ? " · " + esc(estado.erroConexao) : ""}${pendentes() ? ` · ${pendentes()} ação(ões) aguardando envio` : ""}</div>
       ${blocoConexao()}</div>
+    <h2 class="sec">Notificações</h2>${blocoNotificacoes()}
     <h2 class="sec">Sobre</h2><div class="card"><div class="p" style="margin:0">Dudoo Web 1.0 · Adicione à Tela de Início para abrir como app.</div></div>`;
 }
 
@@ -1030,9 +1056,29 @@ document.addEventListener("click", async (e) => {
     return;
   }
   if ((el = q("[data-ideia-acao]"))) { acaoIdeia(el.dataset.ideia, el.dataset.ideiaAcao); return; }
+  if ((el = q("[data-push-cat]"))) {
+    const id = el.dataset.pushCat, atual = DudooPush.mesclar((d && d.push) || {}, prefPush()).categorias.find((c) => c.id === id);
+    guardarPrefPush({ categorias: { [id]: !(atual && atual.ligada) } });
+    return;
+  }
   if ((el = q("[data-acao]"))) {
     const a = el.dataset.acao;
     if (a === "atualizar") { await carregar(true); await enviarFila(); desenhar(); avisar(estado.demo ? "Modo demonstração." : "Atualizado."); }
+    else if (a === "push-ativar") {
+      try {
+        const inscricao = await DudooPush.ativar((d.push || {}).chave_publica);
+        comando("registrar_push", { inscricao, aparelho: DudooPareamento.rotuloDoAparelho(navigator.userAgent) }, null);
+        estado.pushSit = await DudooPush.situacao(); desenhar();
+        avisar("Avisos ativados. O Dudoo confirma no próximo ciclo (até 15 min).");
+      } catch (erro) { avisar(String(erro.message || erro)); }
+    }
+    else if (a === "push-desativar") {
+      const endpoint = await DudooPush.desativar();
+      if (endpoint) comando("remover_push", { endpoint }, null);
+      estado.pushSit = await DudooPush.situacao(); desenhar(); avisar("Avisos desativados neste aparelho.");
+    }
+    else if (a === "push-silencio") { const s = DudooPush.mesclar(d.push || {}, prefPush()).silencio || {}; guardarPrefPush({ silencio: { ativo: !s.ativo } }); }
+    else if (a === "push-horario") { guardarPrefPush({ silencio: { de: ($("#push-de") || {}).value || "22:00", ate: ($("#push-ate") || {}).value || "07:00" } }); avisar("Horário de silêncio salvo."); }
     else if (a === "voltar") { estado.projeto = null; desenhar(); }
     else if (a === "voltar-arquivado") { estado.arquivado = null; desenhar(); }
     else if (a === "arquivados") { estado.arquivadosAbertos = !estado.arquivadosAbertos; desenhar(); }
@@ -1283,6 +1329,12 @@ function garantirRevisaoJs() {
   lerLinkDeConexao();
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* sem suporte: segue */ }
   estado.dados = ler(CHAVE_DADOS, null);
+  const abaPedida = new URLSearchParams(location.search).get("aba");                      // toque numa notificação com o app fechado
+  if (abaPedida) { estado.aba = DudooPush.destino(abaPedida); history.replaceState(null, "", location.pathname); }
+  if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (ev) => {
+    if (ev.data && ev.data.tipo === "abrir-aba") { estado.aba = DudooPush.destino(ev.data.aba); estado.projeto = null; desenhar(); }
+  });
+  DudooPush.situacao().then((s) => { estado.pushSit = s; if (estado.dados) desenhar(); }).catch(() => {});
   await carregar(false);
   desenhar();
   enviarFila();
