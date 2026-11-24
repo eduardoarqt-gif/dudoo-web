@@ -332,20 +332,27 @@ function marcarNotasVistas() {
   gravar(CHAVE_NOTAS_VISTAS, maior || new Date().toISOString());
 }
 const quandoNota = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : `${dataBr(iso.slice(0, 10))} ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`; };
+// Alfinete (24/11/2026): fixa a nota no topo da lista; o mesmo botão desafixa. Nota ainda não gravada no Dudoo (pendente/nova) não tem alfinete.
+const ICONE_ALFINETE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 2h8v3h-1.2l.9 7H19v2h-6v6l-1 2-1-2v-6H5v-2h3.3l.9-7H8z"/></svg>';
+function botaoAlfinete(n) {
+  if (n.pendente || String(n.id).startsWith("novo-")) return "";
+  return `<button type="button" class="nota-pin${n.fixada ? " on" : ""}" data-fixar-nota="${esc(n.id)}" aria-label="${n.fixada ? "Desafixar nota" : "Fixar nota no topo"}" title="${n.fixada ? "Desafixar" : "Fixar no topo"}">${ICONE_ALFINETE}</button>`;
+}
 function cartaoNota(n) {
   const resto = String(n.texto || "").split("\n").slice(1).join("\n").trim();
   const projeto = n.projeto ? `<span class="pill c">${esc(n.projeto)}</span>` : "";
   if (!n.gerada && !n.longa && !n.pendente && !String(n.id).startsWith("novo-")) {      // toque abre pra EDITAR (17/10/2026)
     return `<div class="card nota toque" data-nota-editar="${esc(n.id)}"><div class="linha"><div class="t"><b>${esc(n.titulo)}</b><div class="p">${esc(quandoNota(n.atualizado))}</div>
-      ${resto ? `<div class="nota-previa">${esc(resto.slice(0, 160))}</div>` : ""}</div>${projeto}</div></div>`;
+      ${resto ? `<div class="nota-previa">${esc(resto.slice(0, 160))}</div>` : ""}</div>${projeto}${botaoAlfinete(n)}</div></div>`;
   }
   const aviso = n.gerada ? "gerada pelo Dudoo (só leitura)" : n.longa ? "nota longa: edite no Dudoo" : "";
-  return `<details class="card nota${n.pendente ? " pendente" : ""}"><summary><span class="t"><b>${esc(n.titulo)}</b><span class="p">${esc(quandoNota(n.atualizado))}${n.pendente ? " · aguardando o Dudoo" : ""}${aviso ? " · " + aviso : ""}</span></span>${projeto}</summary>
+  return `<details class="card nota${n.pendente ? " pendente" : ""}"><summary><span class="t"><b>${esc(n.titulo)}</b><span class="p">${esc(quandoNota(n.atualizado))}${n.pendente ? " · aguardando o Dudoo" : ""}${aviso ? " · " + aviso : ""}</span></span>${projeto}${botaoAlfinete(n)}</summary>
     <div class="nota-texto">${esc(resto || "(sem mais texto)")}</div>
     <button class="btn o peq" style="margin-top:10px" data-copiar-nota="${esc(n.id)}">Copiar texto</button></details>`;
 }
 function blocoNotas(codigo) {
-  const d = estado.dados, lista = todasNotas().filter((n) => (codigo === undefined ? true : codigo === "" ? !n.projeto : n.projeto === codigo));
+  const d = estado.dados, lista = todasNotas().filter((n) => (codigo === undefined ? true : codigo === "" ? !n.projeto : n.projeto === codigo))
+    .sort((a, b) => (b.fixada ? 1 : 0) - (a.fixada ? 1 : 0));                        // fixadas no topo; o resto mantém a ordem (mais recente primeiro; sort estável)
   // 17/10/2026: sem o cartão fixo de "Salvar nota" (criava nota repetida sem querer); a nota existente abre pra EDITAR ao tocar,
   // e a nova abre numa folha pelo botão.
   return `<div class="linha" style="margin-top:6px"><h2 class="sec" style="flex:1;margin:14px 0 8px">${lista.length} nota(s)</h2><button class="btn o peq" data-acao="nova-nota" data-cod-nota="${esc(codigo || "")}">+ Nova nota</button></div>${lista.map(cartaoNota).join("") || '<div class="vazio">Nenhuma nota.</div>'}`;
@@ -946,6 +953,12 @@ document.addEventListener("click", async (e) => {
     const nota = todasNotas().find((x) => x.id === el.dataset.copiarNota);
     const campo = $("#nota-ed");                                           // na folha de edição copia o que está no campo agora
     copiarTexto(campo && el.closest("#folha") ? campo.value : String((nota && nota.texto) || ""));
+    return;
+  }
+  if ((el = q("[data-fixar-nota]"))) {
+    e.preventDefault();
+    const nota = todasNotas().find((x) => x.id === el.dataset.fixarNota);
+    if (nota) { const fixar = !nota.fixada; comando("fixar_nota", { nota_id: nota.id, fixada: fixar }, () => { nota.fixada = fixar; }); }
     return;
   }
   if ((el = q("[data-nota-editar]"))) { abrirNota(el.dataset.notaEditar); return; }
