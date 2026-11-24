@@ -45,9 +45,21 @@ const DudooPush = (() => {
   }
 
   /* Preferências com a escolha local por cima da foto (a foto só reflete a escolha depois que o Dudoo aplica o comando). */
+  /* Lista de reserva (a mesma do Dudoo): aparece mesmo antes do Dudoo do computador entregar a lista na foto. */
+  const CATEGORIAS_PADRAO = [
+    ["portal_decisao", "Cliente aprovou ou pediu revisão"], ["portal_comentario", "Cliente comentou"],
+    ["portal_primeiro_acesso", "Cliente acessou o portal pela 1ª vez"], ["lead_novo", "Lead novo (site ou WhatsApp)"],
+    ["proposta_aberta", "Proposta aberta pelo cliente"], ["proposta_aceita", "Proposta aceita/enviada"],
+    ["recebimento", "Recebimento confirmado"], ["conta_pagar", "Conta a pagar vencendo hoje ou amanhã"],
+    ["rt_pendente", "RT esperando depósito"], ["tarefa_hoje", "Tarefa com prazo hoje"], ["etapa_obra", "Etapa da obra começando"],
+    ["visita_amanha", "Visita de obra amanhã"], ["aniversario", "Aniversário de cliente"],
+    ["fila_parada", "Fila de comandos do app parada"], ["pergunta_pronta", "Resposta do Pergunte ao Dudoo"],
+  ].map(([id, rotulo]) => ({ id, rotulo, ligada: true }));
+
   function mesclar(push, local) {
-    const cats = (push.categorias || []).map((c) => ({ ...c, ligada: local.categorias && c.id in local.categorias ? !!local.categorias[c.id] : c.ligada }));
-    return { ...push, categorias: cats, silencio: { ...(push.silencio || {}), ...(local.silencio || {}) } };
+    const base = (push.categorias && push.categorias.length) ? push.categorias : CATEGORIAS_PADRAO;
+    const cats = base.map((c) => ({ ...c, ligada: local.categorias && c.id in local.categorias ? !!local.categorias[c.id] : c.ligada }));
+    return { ...push, categorias: cats, silencio: { ativo: true, de: "22:00", ate: "07:00", ...(push.silencio || {}), ...(local.silencio || {}) } };
   }
 
   const destino = (aba) => ({ portal: "projetos", leads: "hoje" }[aba] || aba || "hoje");

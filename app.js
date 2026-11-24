@@ -543,17 +543,21 @@ function blocoNotificacoes() {
   const sit = estado.pushSit || { suportado: false, instalado: false, inscrito: false, permissao: "default" };
   const push = (estado.dados && estado.dados.push) || {};
   if (estado.demo) return '<div class="card"><div class="p" style="margin:0">Conecte o app ao Dudoo para ativar os avisos.</div></div>';
-  if (!sit.suportado) return '<div class="card"><div class="p" style="margin:0">Este navegador não oferece notificações. No iPhone, use o app da Tela de Início (iOS 16.4 ou mais novo).</div></div>';
-  if (!sit.instalado) return '<div class="card"><div class="p" style="margin:0">Para receber avisos, adicione o Dudoo Web à Tela de Início (Compartilhar → Adicionar à Tela de Início) e abra por lá.</div></div>';
-  if (!push.chave_publica) return '<div class="card"><div class="p" style="margin:0">O Dudoo ainda não preparou as notificações. Abra o Dudoo no computador (versão atualizada) e toque em Atualizar.</div></div>';
-  if (!sit.inscrito) return `<div class="card"><div class="p" style="margin:0 0 8px">Receba aviso quando o cliente aprovar, comentar, chegar um lead, cair um recebimento e mais. Os avisos saem com o Dudoo aberto no computador e nunca mostram valores.</div><button class="btn" data-acao="push-ativar">Ativar avisos</button></div>`;
+  // As escolhas (quais avisos receber e o silêncio) aparecem SEMPRE; o que falta pra os avisos chegarem fica explicado no topo (24/11/2026).
+  let topo;
+  if (!sit.suportado) topo = '<div class="p" style="margin:0 0 8px">Este navegador não oferece notificações. No iPhone, use o app da Tela de Início (iOS 16.4 ou mais novo).</div>';
+  else if (!sit.instalado) topo = '<div class="p" style="margin:0 0 8px">Para receber avisos, adicione o Dudoo Web à Tela de Início (Compartilhar → Adicionar à Tela de Início) e abra por lá.</div>';
+  else if (!push.chave_publica) topo = '<div class="p" style="margin:0 0 8px">O Dudoo ainda não preparou as notificações. Abra o Dudoo no computador (versão atualizada) e toque em Atualizar. Já dá pra escolher os avisos abaixo.</div>';
+  else if (!sit.inscrito) topo = '<div class="p" style="margin:0 0 8px">Receba aviso quando o cliente aprovar, comentar, chegar um lead, cair um recebimento e mais. Os avisos saem com o Dudoo aberto no computador e nunca mostram valores.</div><button class="btn" data-acao="push-ativar" style="margin-bottom:10px">Ativar avisos</button>';
+  else topo = '<div class="p" style="margin:0 0 8px">Avisos ativos neste aparelho. A escolha vale depois que o Dudoo aplicar (até 15 min).</div>';
   const m = DudooPush.mesclar(push, prefPush());
   const linhas = m.categorias.map((c) => `<div class="linha"><div class="t">${esc(c.rotulo)}</div><button class="btn ${c.ligada ? "" : "o"} peq" data-push-cat="${esc(c.id)}">${c.ligada ? "Ligado" : "Desligado"}</button></div>`).join("");
   const s = m.silencio || {};
-  return `<div class="card"><div class="p" style="margin:0 0 8px">Avisos ativos neste aparelho. A escolha vale depois que o Dudoo aplicar (até 15 min).</div>${linhas}
+  const rodape = sit.inscrito ? '<button class="btn o" data-acao="push-desativar" style="margin-top:10px">Desativar neste aparelho</button>' : "";
+  return `<div class="card">${topo}${linhas}
     <div class="linha" style="margin-top:10px"><div class="t">Silêncio${s.ativo ? ` das ${esc(s.de)} às ${esc(s.ate)}` : ""}</div><button class="btn ${s.ativo ? "" : "o"} peq" data-acao="push-silencio">${s.ativo ? "Ligado" : "Desligado"}</button></div>
     ${s.ativo ? `<div class="linha"><input class="campo" id="push-de" type="time" value="${esc(s.de || "22:00")}" style="margin:0"><input class="campo" id="push-ate" type="time" value="${esc(s.ate || "07:00")}" style="margin:0"><button class="btn o peq" data-acao="push-horario">Salvar</button></div>` : ""}
-    <button class="btn o" data-acao="push-desativar" style="margin-top:10px">Desativar neste aparelho</button></div>`;
+    ${rodape}</div>`;
 }
 function guardarPrefPush(parcial) {
   const atual = prefPush();
