@@ -3,6 +3,9 @@
    Sem conexão configurada o app abre em modo demonstração com dados de exemplo. */
 "use strict";
 
+// Sobem sozinhas na publicação (tools/publicar_dudoo_web.py); o número é o mesmo do cache em service-worker.js.
+const VERSAO_WEB = '44';
+const VERSAO_WEB_DATA = '27/11/2026';
 const CHAVE_CFG = "dudoo_web_cfg", CHAVE_FILA = "dudoo_web_fila", CHAVE_DADOS = "dudoo_web_dados", CHAVE_CRED = "dudoo_web_cred", CHAVE_PIN = "dudoo_web_pin", CHAVE_NOTAS_VISTAS = "dudoo_web_notas_vistas", CHAVE_PUSH_PREF = "dudoo_web_push_pref";
 const $ = (s) => document.querySelector(s);
 const ler = (k, padrao) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch (e) { return padrao; } };
@@ -583,7 +586,7 @@ function telaMais() {
     <h2 class="sec">Conexão com o Dudoo</h2><div class="card"><div class="p" style="margin:0 0 8px">${estado.demo ? "Modo demonstração (dados de exemplo)." : textoConexao() + (estado.ultimaAtualizacao ? " · atualizado às " + estado.ultimaAtualizacao : "")}${estado.erroConexao ? " · " + esc(estado.erroConexao) : ""}${pendentes() ? ` · ${pendentes()} ação(ões) aguardando envio` : ""}</div>
       ${blocoConexao()}</div>
     <h2 class="sec">Notificações</h2>${blocoNotificacoes()}
-    <h2 class="sec">Sobre</h2><div class="card"><div class="p" style="margin:0">Dudoo Web 1.0 · Adicione à Tela de Início para abrir como app.</div></div>`;
+    <h2 class="sec">Sobre</h2><div class="card"><div class="p" style="margin:0">Dudoo Web versão ${VERSAO_WEB} · ${VERSAO_WEB_DATA} · Adicione à Tela de Início para abrir como app.</div></div>`;
 }
 
 function telaSemDados() {

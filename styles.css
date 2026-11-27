@@ -103,6 +103,7 @@ textarea.campo{min-height:96px;resize:vertical}
 #app,#app *{max-width:100%}
 .t,.p,h1,.card{overflow-wrap:anywhere;word-break:break-word}
 .linha>*{min-width:0}
+.linha>.btn.peq{flex:none}
 input,textarea,select{font-size:16px}
 #abas{width:100%}
 
