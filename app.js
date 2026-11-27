@@ -4,7 +4,7 @@
 "use strict";
 
 // Sobem sozinhas na publicação (tools/publicar_dudoo_web.py); o número é o mesmo do cache em service-worker.js.
-const VERSAO_WEB = '45';
+const VERSAO_WEB = '46';
 const VERSAO_WEB_DATA = '27/11/2026';
 const CHAVE_CFG = "dudoo_web_cfg", CHAVE_FILA = "dudoo_web_fila", CHAVE_DADOS = "dudoo_web_dados", CHAVE_CRED = "dudoo_web_cred", CHAVE_PIN = "dudoo_web_pin", CHAVE_NOTAS_VISTAS = "dudoo_web_notas_vistas", CHAVE_PUSH_PREF = "dudoo_web_push_pref";
 const $ = (s) => document.querySelector(s);
@@ -1361,5 +1361,12 @@ function garantirRevisaoJs() {
   await carregar(false);
   desenhar();
   enviarFila();
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js").catch(() => {});
+  if ("serviceWorker" in navigator) {
+    // Versão nova (27/11/2026): procura ao abrir e ao voltar pro app e recarrega sozinho; com uma janela aberta, espera a próxima vez.
+    const tinhaControle = !!navigator.serviceWorker.controller;      // só recarrega em atualização, não na primeira instalação
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (tinhaControle && !document.getElementById("folha")) location.reload(); });
+    const procurar = () => navigator.serviceWorker.getRegistration().then((r) => r && r.update()).catch(() => {});
+    navigator.serviceWorker.register("service-worker.js").then(procurar).catch(() => {});
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) procurar(); });
+  }
 })();

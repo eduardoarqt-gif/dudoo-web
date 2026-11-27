@@ -1,9 +1,9 @@
 // Dudoo Web — service worker: guarda o app (shell) para abrir offline; os dados vêm da rede e caem no cache local do app.
-const VERSAO = "dudoo-web-v45";
+const VERSAO = "dudoo-web-v46";
 const ARQUIVOS = ["./", "index.html", "styles.css", "app.js", "quadro.js", "revisao.js", "escolhas.js", "demo.js", "mascaras.js", "cronograma.js", "pareamento.js", "notificacoes.js", "cronograma.css", "manifest.webmanifest", "icon.svg", "icon-maskable.svg", "icon-180.png", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(ARQUIVOS)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(ARQUIVOS.map((a) => new Request(a, { cache: "reload" })))).then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== VERSAO).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
@@ -14,7 +14,7 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;            // API do Wix: nunca do cache do SW
   e.respondWith(
-    fetch(req).then((r) => {
+    fetch(req, { cache: "no-cache" }).then((r) => {      // sempre confere no servidor: o cache do navegador segurava a versão antiga
       const copia = r.clone();
       caches.open(VERSAO).then((c) => c.put(req, copia));
       return r;
