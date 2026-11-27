@@ -104,6 +104,7 @@ textarea.campo{min-height:96px;resize:vertical}
 .t,.p,h1,.card{overflow-wrap:anywhere;word-break:break-word}
 .linha>*{min-width:0}
 .linha>.btn.peq{flex:none}
+a.btn{box-sizing:border-box;text-decoration:none}
 input,textarea,select{font-size:16px}
 #abas{width:100%}
 

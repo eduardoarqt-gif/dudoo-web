@@ -72,8 +72,8 @@ async function rvIniciarAutorizacao() {
   estadoRevisao.verificador = verificador;
   const url = "https://www.dropbox.com/oauth2/authorize?" + new URLSearchParams({ client_id: chave, response_type: "code", token_access_type: "offline",
     code_challenge: desafio, code_challenge_method: "S256", scope: ESCOPOS_DBX }).toString();
-  window.open(url, "_blank");
-  abrirFolha("Conectar o Dropbox", `<div class="mini">Autorize na página do Dropbox que abriu (conta do escritório). Ele mostra um código: copie e cole aqui.</div>
+  abrirFolha("Conectar o Dropbox", `<div class="mini">Abra o Dropbox, autorize com a conta do escritório, copie o código que ele mostrar e cole aqui.</div>
+    <a class="btn o" href="${url}" target="_blank" rel="noopener">Abrir o Dropbox</a>
     <label class="rot">Código do Dropbox</label><input class="campo" id="rv-codigo" autocomplete="off" autocapitalize="off">`, "Conectar", () => {
     const codigo = ($("#rv-codigo").value || "").trim();
     if (!codigo) return false;

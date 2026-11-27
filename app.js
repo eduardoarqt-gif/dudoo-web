@@ -4,7 +4,7 @@
 "use strict";
 
 // Sobem sozinhas na publicação (tools/publicar_dudoo_web.py); o número é o mesmo do cache em service-worker.js.
-const VERSAO_WEB = '44';
+const VERSAO_WEB = '45';
 const VERSAO_WEB_DATA = '27/11/2026';
 const CHAVE_CFG = "dudoo_web_cfg", CHAVE_FILA = "dudoo_web_fila", CHAVE_DADOS = "dudoo_web_dados", CHAVE_CRED = "dudoo_web_cred", CHAVE_PIN = "dudoo_web_pin", CHAVE_NOTAS_VISTAS = "dudoo_web_notas_vistas", CHAVE_PUSH_PREF = "dudoo_web_push_pref";
 const $ = (s) => document.querySelector(s);
