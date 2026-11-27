@@ -259,6 +259,7 @@ function telaProjetos() {
     const p = d.projetos.find((x) => x.id === estado.projeto);
     if (!p) { estado.projeto = null; return telaProjetos(); }
     const abas = [["resumo", "Resumo"], ["tarefas", "Tarefas"], ["cronograma", "Cronograma"], ["orcamento", "Orçamento"], ["revisar", "Revisar PDF"], ["notas", "Notas"], ["portal", "Portal"]];
+    if ((d.escolhas || []).some((e) => e.codigo === p.codigo)) abas.splice(1, 0, ["escolhas", "Escolhas"]);          // só o projeto com lista (escolhas.js)
     let corpo = "";
     if (estado.subProjeto === "resumo") {
       corpo = `<h2 class="sec">Andamento</h2><div class="card">${p.frentes.map((f) => `<div class="linha" style="margin-bottom:10px"><div class="t">${esc(f.nome)}<div class="barra"><i style="width:${f.pct}%"></i></div></div><span class="val dir">${f.pct}%</span></div>`).join("")}</div>
@@ -274,6 +275,8 @@ function telaProjetos() {
     } else if (estado.subProjeto === "revisar") {
       if (typeof telaRevisar !== "function") garantirRevisaoJs();
       corpo = typeof telaRevisar === "function" ? telaRevisar(p.codigo) : '<div class="vazio">Carregando o Revisar PDF…</div>';          // anotar PDFs do projeto (revisao.js)
+    } else if (estado.subProjeto === "escolhas") {
+      corpo = typeof telaEscolhas === "function" ? telaEscolhas(p.codigo) : '<div class="vazio">Atualize o app pra abrir as Escolhas.</div>';
     } else if (estado.subProjeto === "notas") {
       corpo = blocoNotas(p.codigo);
     } else {

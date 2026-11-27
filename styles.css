@@ -176,3 +176,18 @@ body.qd-aberto #abas{display:none}
 .qd-pag .qd-b{height:26px;font-size:20px}
 #qd-aviso{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 10px);max-width:80%;background:rgba(20,20,18,.82);color:#fff;
   border-radius:10px;padding:8px 12px;font-size:13px;text-align:center;z-index:3}
+/* Escolhas (projeto): fotos de referência, anotações da loja e visor de foto */
+.esc-listas{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.esc-listas .btn{width:auto;margin:0}
+.esc-medidas{font-size:17px;font-weight:500;margin:4px 0}
+.esc-fotos{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.esc-foto{height:110px;min-width:60px;max-width:100%;border-radius:8px;background:var(--borda);object-fit:cover}
+.esc-mini{width:64px;height:64px;border-radius:8px;object-fit:cover;background:var(--borda)}
+.esc-escolha{border:1px solid var(--borda);border-radius:10px;padding:9px 10px;margin-top:10px}
+.esc-escolha.marcada{border-color:var(--bronze);border-left-width:4px}
+.esc-selo{color:var(--bronze)}
+.esc-marcar{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:14px}
+.esc-visor{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.93);overflow:auto;display:flex}
+.esc-visor img{margin:auto;max-width:100%;max-height:100%}
+.esc-visor.amplo img{max-width:none;max-height:none;width:230%}
+.esc-visor .btn{position:fixed;right:12px;top:calc(env(safe-area-inset-top) + 12px);color:#fff;border-color:#888;margin:0}
